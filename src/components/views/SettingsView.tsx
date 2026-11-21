@@ -372,6 +372,11 @@ export function SettingsView({
                   <span>{previewPlaying ? 'Stop Preview' : 'Preview Urdu Voice'}</span>
                 </button>
               </div>
+              {voicePreviewError && (
+                <p role="alert" className="mt-2 text-xs text-rose-300">
+                  ZARA voice preview failed: {voicePreviewError}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 border-t border-slate-800/80 pt-4 sm:grid-cols-2">
