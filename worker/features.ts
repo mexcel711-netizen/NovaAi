@@ -92,7 +92,7 @@ function mapCharacter(row: Row): CharacterProfile {
     bio: String(row.bio ?? ''),
     personality: (row.personality as ResponseStyle) || 'friendly_professional',
     default_mood: (row.default_mood as MoodMode) || 'calm',
-    tts_voice: String(row.tts_voice || 'Kore'),
+    tts_voice: 'ur-PK-UzmaNeural',
     system_prompt: String(row.system_prompt ?? ''),
     learned_traits: safeArray<string>(row.learned_traits),
     life_journal: safeArray<string>(row.life_journal),
@@ -182,7 +182,7 @@ async function readConfig(db: D1Database): Promise<AppConfig> {
     custom_prompt: get('custom_prompt', DEFAULT_CONFIG.custom_prompt),
     language: get('language', DEFAULT_CONFIG.language) as AppConfig['language'],
     response_tone: get('response_tone', DEFAULT_CONFIG.response_tone) as AppConfig['response_tone'],
-    tts_voice: get('tts_voice', DEFAULT_CONFIG.tts_voice),
+    tts_voice: 'ur-PK-UzmaNeural',
     voice_speed: number('voice_speed', 1, 0.5, 1.75),
     voice_volume: number('voice_volume', 1, 0, 1.5),
     stt_model: get('stt_model', 'base') as AppConfig['stt_model'],
@@ -434,7 +434,7 @@ async function handleOnboarding(db: D1Database, body: Row) {
   let selected = await one<Row>(db, 'SELECT * FROM characters WHERE slug=?', targetSlug);
   if (!selected) selected = await one<Row>(db, 'SELECT * FROM characters ORDER BY id LIMIT 1');
   if (!selected) return json({ error: 'Character presets are not initialized. Apply migration 0002 first.' }, 503);
-  const genderVoice = payload.characterGender === 'male' ? 'Puck' : 'Zephyr';
+  const genderVoice = 'ur-PK-UzmaNeural'; // Fixed speaker identity across every character and language.
   const prompt = [
     `Tum ${assistantName} ho (${assistantAge} saal), ${userName} ki personal AI companion (${payload.characterPreset || 'Companion'}).`,
     `User ko hamesha "${nickname}" keh kar bulao.`,
