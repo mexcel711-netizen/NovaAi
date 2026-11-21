@@ -1,4 +1,5 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { ZARA_SOUL_PROMPT } from '../src/lib/zaraSoul';
 import { synthesizeUzma } from './edgeTts';
 import {
   buildQuickUrduPhoneticScript,
@@ -144,6 +145,7 @@ export function buildSystemInstruction(params: {
     : '';
 
   return [
+    ZARA_SOUL_PROMPT,
     `Your name is ${config.assistant_name}.`,
     config.custom_prompt,
     charBlock,
