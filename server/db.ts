@@ -491,7 +491,7 @@ export function updateConfig(partial: Partial<AppConfig>): AppConfig {
   `);
   for (const [k, v] of Object.entries(partial)) {
     if (v !== undefined) {
-      stmt.run(k, String(v));
+      stmt.run(k, k === 'tts_voice' ? 'ur-PK-UzmaNeural' : String(v));
     }
   }
   return getConfig();
