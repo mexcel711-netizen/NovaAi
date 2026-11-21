@@ -5,7 +5,7 @@ import {
 } from '../src/lib/edgeTtsSecurity';
 
 export const NOVA_VOICE = 'ur-PK-UzmaNeural';
-const OUTPUT_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
+const OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
 const EDGE_URL = 'wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1';
 
 type EdgeWorkerWebSocket = WebSocket & { accept(): void };
@@ -39,14 +39,15 @@ function base64(bytes: Uint8Array): string {
 
 function speechConfigMessage(): string {
   return [
-    'Content-Type:application/json; charset=utf-8',
-    'Path:speech.config',
+    'Content-Type: application/json; charset=utf-8',
+    'Path: speech.config',
     '',
+    `X-Timestamp:${new Date().toUTCString()}`,
     JSON.stringify({
       context: {
         synthesis: {
           audio: {
-            metadataoptions: { sentenceBoundaryEnabled: 'false', wordBoundaryEnabled: 'false' },
+            metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: false },
             outputFormat: OUTPUT_FORMAT,
           },
         },
@@ -63,9 +64,10 @@ function ssmlMessage(text: string, requestId: string): string {
     .replace(/([،,;؛])\s+/g, '$1<break time="110ms"/>')
     .replace(/([.!?؟۔])\s+/g, '$1<break time="230ms"/>');
   return [
-    `X-RequestId:${requestId}`,
-    'Content-Type:application/ssml+xml',
-    'Path:ssml',
+    `X-RequestId: ${requestId}`,
+    `X-Timestamp: ${new Date().toUTCString()}`,
+    'Content-Type: application/ssml+xml',
+    'Path: ssml',
     '',
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK"><voice name="${NOVA_VOICE}"><prosody rate="-6%" pitch="+1Hz" volume="+0%">${pacedText}</prosody></voice></speak>`,
   ].join('\r\n');
@@ -81,6 +83,8 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
   const url = new URL(EDGE_URL);
   url.searchParams.set('Ocp-Apim-Subscription-Key', EDGE_TTS_TRUSTED_CLIENT_TOKEN);
   url.searchParams.set('Sec-MS-GEC', secMsGec);
+  const connectionId = crypto.randomUUID().replace(/-/g, '').toLowerCase();
+  url.searchParams.set('ConnectionId', connectionId);
   url.searchParams.set('Sec-MS-GEC-Version', `2-${EDGE_TTS_CHROMIUM_VERSION}`);
 
   const major = EDGE_TTS_CHROMIUM_VERSION.split('.')[0];
@@ -94,6 +98,7 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
       'User-Agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/${major}.0.0.0 Safari/537.36 Edg/${major}.0.0.0`,
       Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
       'Accept-Language': 'en-US,en;q=0.9',
+      'Cookie': `muid=${crypto.randomUUID().replace(/-/g, '').toUpperCase()};`,
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
     },
@@ -180,7 +185,7 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
     socket.accept();
     try {
       socket.send(speechConfigMessage());
-      socket.send(ssmlMessage(cleanText, crypto.randomUUID().replace(/-/g, '')));
+      socket.send(ssmlMessage(cleanText, connectionId));
     } catch (error) {
       finish(error instanceof Error ? error : new Error('Unable to start Urdu voice synthesis.'));
     }
