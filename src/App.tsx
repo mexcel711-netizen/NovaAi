@@ -13,6 +13,7 @@ import { RecentView } from './components/views/RecentView';
 import { SettingsView } from './components/views/SettingsView';
 import { SkillsView } from './components/views/SkillsView';
 import { executeDesktopCommand } from './lib/desktopIntent';
+import { linkUsbDirectoryHandle, performUsbMemoryTransfer } from './lib/usbTransfer';
 import { useCameraAwareness } from './lib/useCameraAwareness';
 import {
   isSpeechRecognitionSupported,
@@ -71,6 +72,9 @@ const DEFAULT_CLIENT_CONFIG: AppConfig = {
   assistant_age: '21',
   whatsapp_number: '',
   referral_source: '',
+  auto_usb_transfer: false,
+  last_usb_sync_at: '',
+  last_usb_drive_label: '',
   onboarding_completed: false,
 };
 
@@ -386,6 +390,23 @@ export default function App() {
       if (data.providerStatus) setProviderStatus(data.providerStatus);
     }
   }, []);
+
+  const handleToggleAutoUsb = async (enabled: boolean) => {
+    await handleSaveConfig({ auto_usb_transfer: enabled });
+  };
+
+  const handleTransferToUsb = async () => {
+    const outcome = await performUsbMemoryTransfer({ interactive: true });
+    if (outcome.ok) {
+      await handleSaveConfig({
+        last_usb_sync_at: new Date().toISOString(),
+        last_usb_drive_label: outcome.driveLabel,
+      });
+    }
+    return outcome;
+  };
+
+  const handleLinkUsbFolder = async () => linkUsbDirectoryHandle();
 
   const handleSelectMood = useCallback(
     async (mood: MoodMode) => {
@@ -1276,6 +1297,12 @@ export default function App() {
               notes={notes}
               reminders={reminders}
               knowledge={knowledge}
+              autoUsbTransfer={config.auto_usb_transfer}
+              lastUsbSyncAt={config.last_usb_sync_at}
+              lastUsbDriveLabel={config.last_usb_drive_label}
+              onToggleAutoUsb={handleToggleAutoUsb}
+              onTransferToUsb={handleTransferToUsb}
+              onLinkUsbFolder={handleLinkUsbFolder}
               onAddMemory={async (input) => {
                 const res = await fetch('/api/memories', {
                   method: 'POST',
