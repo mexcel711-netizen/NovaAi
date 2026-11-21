@@ -58,7 +58,7 @@ function registerMediaProtocol() {
   protocol.handle('zara-media', async (request) => {
     try {
       const url = new URL(request.url);
-      const name = decodeURIComponent(url.pathname.replace(/^\\/+/, ''));
+      const name = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
       if (!name || name !== path.basename(name)) return new Response('Not found', { status: 404 });
       const target = path.resolve(MEDIA_DIR, name);
       if (!target.startsWith(MEDIA_DIR + path.sep)) return new Response('Forbidden', { status: 403 });
