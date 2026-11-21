@@ -36,6 +36,11 @@ bun run deploy
 - Never commit API keys, `.env` files, local SQLite databases, or Wrangler state.
 
 
+## Native ZARA AI desktop application
+The optional Electron shell is in [desktop-electron](desktop-electron/README.md). It opens the existing hosted ZARA app in a native Windows window, starts the existing local desktop agent automatically, writes a main-process log, bootstraps the SOUL/MEMORY data files without overwriting existing files, and supports GitHub Release updates for packaged builds. The web/PWA remains available separately.
+
+To run it on Windows, use Node.js 20+ and run `cd desktop-electron`, `npm install`, then `npm start`. To build an installer, run `npm run dist:win` from that directory.
+
 ## ZARA AI holographic command centre and desktop companion
 The Home screen includes a holographic command-centre layout and an optional local Desktop Bridge panel.
 
