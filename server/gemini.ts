@@ -5,7 +5,6 @@ import {
   extractEmotionAndCleanText,
   formatExpressiveSpeechPrompt,
   isRomanUrduText,
-  splitSpeechChunks,
 } from '../src/lib/emotionAndSpeech';
 import type {
   AppConfig,
@@ -541,31 +540,8 @@ export async function executeStudyTaskWithAi(params: {
   };
 }
 
-async function synthesizeEdgeTtsWithTimeout(
-  text: string,
-  voiceName: string,
-  timeoutMs = 2400
-): Promise<Array<{ audioBase64: string; mimeType: string }>> {
-  const work = async () => {
-    const tts = new UniversalEdgeTTS(text, voiceName, { rate: '+2%', pitch: '+3Hz' });
-    const result = await tts.synthesize();
-    const arr = Buffer.from(await result.audio.arrayBuffer());
-    if (arr.length === 0) return [];
-    return [{ audioBase64: arr.toString('base64'), mimeType: 'audio/mpeg' }];
-  };
-  return Promise.race([
-    work(),
-    new Promise<Array<{ audioBase64: string; mimeType: string }>>((resolve) =>
-      setTimeout(() => resolve([]), timeoutMs)
-    ),
-  ]);
-}
-
 /**
- * Generates authentic, expressive female neural speech:
- * 1. Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts` -> `gemini-3.8-flash-lite-tts`) when GEMINI_API_KEY is available
- * 2. Microsoft Edge Neural (`ur-PK-UzmaNeural` / `en-US-JennyNeural`) via fast timeout race
- * 3. Smart Neural HTTPS fallback (`ur` for Urdu script, `hi` for Roman Urdu natural pronunciation, `en` for English)
+ * Generates all NOVA speech through one fixed Microsoft Pakistani Urdu Neural speaker.
  */
 async function transliterateToNaturalUrduForSpeech(
   text: string,
@@ -637,7 +613,7 @@ export async function generateNovaSpeech(params: {
   if (!audio?.length) {
     const message = lastError instanceof Error ? lastError.message : 'Urdu voice synthesis failed.';
     console.warn('NOVA Urdu voice unavailable:', message);
-    return { audioChunks: [], engine: 'edge-neural-v2' };
+    throw new Error('Pakistani Urdu Neural voice is temporarily unavailable.');
   }
 
   return {
