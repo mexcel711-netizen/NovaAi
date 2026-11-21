@@ -821,7 +821,7 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
     return json({ skills: await getSkills(db) });
   }
 
-  const skillRoute = path.match(/^\\/api\\/skills\\/(\\d+)$/);
+  const skillRoute = path.match(/^\/api\/skills\/(\d+)$/);
   if (skillRoute && method === 'PATCH') {
     const body = await parseBody(request);
     if (typeof body.is_enabled !== 'boolean') return json({ error: 'is_enabled must be a boolean.' }, 400);
@@ -829,13 +829,13 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
     return json({ ok: true, skills: await getSkills(db) });
   }
 
-  const memoryRoute = path.match(/^\\/api\\/memories\\/(\\d+)$/);
+  const memoryRoute = path.match(/^\/api\/memories\/(\d+)$/);
   if (memoryRoute && method === 'DELETE') {
     await exec(db, 'UPDATE memories SET is_deleted=1,updated_at=CURRENT_TIMESTAMP WHERE id=?', Number(memoryRoute[1]));
     return json({ ok: true, memories: await getMemories(db) });
   }
 
-  const conversationRoute = path.match(/^\\/api\\/conversations\\/([^/]+)$/);
+  const conversationRoute = path.match(/^\/api\/conversations\/([^/]+)$/);
   if (conversationRoute && method === 'DELETE') {
     await exec(db, 'DELETE FROM conversations WHERE session_id=?', decodeURIComponent(conversationRoute[1]));
     const sessions = await all<Row>(
