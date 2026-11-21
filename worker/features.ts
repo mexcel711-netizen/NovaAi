@@ -27,6 +27,7 @@ interface D1Database {
 }
 interface FeatureEnv {
   DB: D1Database;
+  ASSETS: { fetch(request: Request): Promise<Response> };
   AI?: unknown;
   GEMINI_API_KEY?: string;
 }
@@ -670,6 +671,80 @@ async function handleVision(db: D1Database, env: FeatureEnv, body: Row) {
   return json({ reply, emotion, language, modelUsed });
 }
 
+async function handleDesktopInstaller(request: Request, env: FeatureEnv): Promise<Response> {
+  const url = new URL(request.url);
+  const assetUrl = new URL('/desktop-agent.mjs', url.origin);
+  const assetResponse = await env.ASSETS.fetch(new Request(assetUrl));
+  if (!assetResponse.ok) {
+    return json({ error: 'Desktop companion asset is missing from this deployment. Rebuild the Worker assets and try again.' }, 503);
+  }
+  const agentSource = await assetResponse.text();
+  const os = (url.searchParams.get('os') || 'win').toLowerCase();
+  const origin = url.origin;
+
+  if (os === 'agent') {
+    return new Response(agentSource, {
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="nova-agent.mjs"',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  if (['unix', 'mac', 'linux'].includes(os)) {
+    const delimiter = 'NOVA_AGENT_SOURCE_END';
+    const shell = [
+      '#!/usr/bin/env bash',
+      'set -e',
+      'mkdir -p "$HOME/.nova-desktop"',
+      `cat <<'${delimiter}' > "$HOME/.nova-desktop/agent.mjs"`,
+      agentSource,
+      delimiter,
+      'echo "NOVA Desktop Companion installed in $HOME/.nova-desktop/agent.mjs"',
+      `echo "Open NOVA in your browser (${origin}) and paste the pairing token shown below."`,
+      'node "$HOME/.nova-desktop/agent.mjs"',
+    ].join('\n');
+    return new Response(shell, {
+      headers: {
+        'Content-Type': 'text/x-shellscript; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="nova-desktop-setup.sh"',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  const bytes = new TextEncoder().encode(agentSource);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  const encodedAgent = btoa(binary);
+  const batch = [
+    '@echo off',
+    'setlocal',
+    'set NOVA_DIR=%USERPROFILE%\\.nova-desktop',
+    'if not exist "%NOVA_DIR%" mkdir "%NOVA_DIR%"',
+    `powershell -NoProfile -Command "[IO.File]::WriteAllBytes('%NOVA_DIR%\\agent.mjs',[Convert]::FromBase64String('${encodedAgent}'))"`,
+    'echo.',
+    'echo ===================================================',
+    'echo   NOVA AI Laptop Companion Installed Successfully!',
+    `echo   Web App URL: ${origin}`,
+    'echo   Copy the pairing token below into Settings ^> Laptop',
+    'echo ===================================================',
+    'echo.',
+    'node "%NOVA_DIR%\\agent.mjs"',
+    'pause',
+  ].join('\r\n');
+  return new Response(batch, {
+    headers: {
+      'Content-Type': 'application/bat; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="NOVA-Desktop-Setup.bat"',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 /**
  * Implements the APIs shared by the local Express app but previously missing from the
  * production Worker runtime. Returns null when the request belongs to the legacy router.
@@ -798,6 +873,10 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
 
   if (path === '/api/vision' && method === 'POST') {
     return handleVision(db, env, await parseBody(request));
+  }
+
+  if (path === '/api/desktop/installer' && method === 'GET') {
+    return handleDesktopInstaller(request, env);
   }
 
   if (path === '/api/skills' && method === 'POST') {
