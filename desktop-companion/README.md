@@ -1,11 +1,11 @@
-# NOVA Desktop Companion (Windows)
+# ZARA Desktop Companion (Windows)
 
-This optional local agent lets the NOVA web app request a small, explicit set of desktop actions. It binds only to `127.0.0.1`, requires a random pairing token, checks the NOVA site origin, and exposes only an allowlist (Chrome, Edge, Notepad, Calculator, HTTP/HTTPS URLs). It does **not** provide arbitrary shell access, file-system access, keystroke injection, or remote desktop access.
+This optional local agent lets the ZARA web app request a small, explicit set of desktop actions. It binds only to `127.0.0.1`, requires a random pairing token, checks the ZARA site origin, and exposes only an allowlist (Chrome, Edge, Notepad, Calculator, HTTP/HTTPS URLs). It does **not** provide arbitrary shell access, file-system access, keystroke injection, or remote desktop access.
 
 ## Requirements
 - Windows 10/11
 - Node.js 20+ or Bun
-- NOVA repository dependencies installed (`bun install`)
+- ZARA repository dependencies installed (`bun install`)
 
 ## Start
 Open PowerShell in the repository root:
@@ -15,7 +15,7 @@ bun install
 bun run desktop:companion
 ```
 
-The terminal prints a one-time pairing token. Keep the terminal open and paste that token into the NOVA **Desktop Bridge** panel. Do not share it. Stop the companion with Ctrl+C.
+The terminal prints a one-time pairing token. Keep the terminal open and paste that token into the ZARA **Desktop Bridge** panel. Do not share it. Stop the companion with Ctrl+C.
 
 Optional fixed token (store it securely; do not commit it):
 
@@ -25,14 +25,14 @@ bun run desktop:companion
 ```
 
 ## Voice
-When paired, NOVA uses Microsoft Edge neural TTS locally:
+When paired, ZARA uses Microsoft Edge neural TTS locally:
 - Urdu (Pakistan), female: `ur-PK-UzmaNeural`
 - English (US), female: `en-US-JennyNeural`
 
 This is cloud-backed speech synthesis, so it needs internet access. Voice availability and pronunciation can vary; test it on your device.
 
 ## Safety
-- The companion accepts requests only from the production NOVA origin and local Vite development origins.
+- The companion accepts requests only from the production ZARA origin and local Vite development origins.
 - Every request requires the pairing token.
 - App launch is restricted to the listed applications; folder opening is restricted to known user folders.
 - URL opening accepts HTTP/HTTPS only.
@@ -41,7 +41,7 @@ This is cloud-backed speech synthesis, so it needs internet access. Voice availa
 
 
 ## Natural desktop voice commands
-With the companion paired, NOVA understands these supported phrases:
+With the companion paired, ZARA understands these supported phrases:
 - `Chrome kholo` — launch Chrome on the desktop
 - `Chrome ka new tab kholo`, `Chrome ke new tab kholo`, or `new tab kholo` — open a new Chrome tab
 - `YouTube kholo`, `Google kholo`, `Gmail kholo`, `WhatsApp kholo`, `GitHub kholo`, or `ChatGPT kholo` — open the site in a Chrome tab
