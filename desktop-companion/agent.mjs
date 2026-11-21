@@ -4,12 +4,10 @@ import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cpus, freemem, homedir, hostname, totalmem, uptime } from 'node:os';
-import { UniversalEdgeTTS } from 'edge-tts-universal';
 
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.NOVA_BRIDGE_PORT || 3210);
 const TOKEN = process.env.NOVA_BRIDGE_TOKEN || randomBytes(24).toString('hex');
-const VOICES = new Set(['ur-PK-UzmaNeural', 'en-US-JennyNeural', 'en-GB-SoniaNeural']);
 
 function isOriginAllowed(origin) {
   if (!origin) return false;
@@ -153,7 +151,7 @@ const server = createServer(async (req, res) => {
       capabilities: [
         'chrome', 'chrome-new-tab', 'chrome-search', 'edge', 'vscode', 'terminal',
         'notepad', 'calculator', 'explorer', 'task-manager', 'settings',
-        'known-folders', 'files-list', 'files-read', 'system-info', 'urdu-neural-tts',
+        'known-folders', 'files-list', 'files-read', 'system-info',
       ],
     }, origin);
   }
@@ -227,24 +225,6 @@ const server = createServer(async (req, res) => {
       if (process.platform === 'win32') launchChrome(['--new-tab', target]);
       else { const child = spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [target], { detached: true, stdio: 'ignore' }); child.unref(); }
       return send(res, 200, { ok: true, action: 'open-url', url: target }, origin);
-    }
-    if (url.pathname === '/v1/tts') {
-      const text = String(body.text || '').trim();
-      if (!text || text.length > 2500) return send(res, 400, { error: 'Text must be between 1 and 2500 characters.' }, origin);
-      const voice = VOICES.has(body.voice) ? body.voice : (/^[\u0000-\u007f]*$/.test(text) ? 'en-US-JennyNeural' : 'ur-PK-UzmaNeural');
-      const emotion = String(body.emotion || 'calm').toLowerCase();
-      const prosody = {
-        happy: { rate: '+5%', pitch: '+8Hz' }, excited: { rate: '+11%', pitch: '+12Hz' },
-        love: { rate: '-4%', pitch: '+4Hz' },
-        sad: { rate: '-9%', pitch: '-7Hz' }, empathetic: { rate: '-4%', pitch: '+2Hz' },
-        thoughtful: { rate: '-7%', pitch: '-3Hz' }, confident: { rate: '+2%', pitch: '+3Hz' },
-        calm: { rate: '-2%', pitch: '+0Hz' }, angry: { rate: '+3%', pitch: '-2Hz' },
-        surprised: { rate: '+8%', pitch: '+10Hz' },
-      }[emotion] || { rate: '+0%', pitch: '+0Hz' };
-      const tts = new UniversalEdgeTTS(text, voice, { ...prosody, volume: '+0%' });
-      const result = await tts.synthesize();
-      const audioBase64 = Buffer.from(await result.audio.arrayBuffer()).toString('base64');
-      return send(res, 200, { audioChunks: [{ audioBase64, mimeType: 'audio/mpeg' }], engine: 'microsoft-edge-neural', voice }, origin);
     }
     return send(res, 404, { error: 'Not found' }, origin);
   } catch (error) {
