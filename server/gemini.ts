@@ -418,7 +418,7 @@ export async function analyzeStudyMaterial(params: {
         : [
             `Review core concepts of ${params.title}`,
             params.goal ? `Apply principles directly to: ${params.goal}` : 'Build a small hands-on prototype',
-            'Ask NOVA follow-up questions in chat anytime',
+            'Ask ZARA follow-up questions in chat anytime',
           ],
     modelUsed: 'gemini-4-hydrogen',
   };
@@ -541,7 +541,7 @@ export async function executeStudyTaskWithAi(params: {
 }
 
 /**
- * Generates all NOVA speech through one fixed Microsoft Pakistani Urdu Neural speaker.
+ * Generates all ZARA speech through one fixed Microsoft Pakistani Urdu Neural speaker.
  */
 async function transliterateToNaturalUrduForSpeech(
   text: string,
@@ -612,7 +612,7 @@ export async function generateNovaSpeech(params: {
 
   if (!audio?.length) {
     const message = lastError instanceof Error ? lastError.message : 'Urdu voice synthesis failed.';
-    console.warn('NOVA Urdu voice unavailable:', message);
+    console.warn('ZARA Urdu voice unavailable:', message);
     throw new Error('Pakistani Urdu Neural voice is temporarily unavailable.');
   }
 
