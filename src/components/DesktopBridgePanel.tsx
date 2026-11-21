@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, FolderOpen, Link2, Monitor, Play, Terminal, Unplug, Usb } from 'lucide-react';
 
 import {
@@ -18,8 +18,21 @@ export function DesktopBridgePanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [fileListing, setFileListing] = useState<string[]>([]);
+  const isNativeDesktop = typeof window !== 'undefined' && Boolean(window.zaraDesktop);
+
+  useEffect(() => {
+    if (!isNativeDesktop) return;
+    setToken('native desktop runtime');
+    setStatus('connected');
+    setMessage('Built-in ZARA desktop runtime connected');
+  }, [isNativeDesktop]);
 
   const connect = async () => {
+    if (isNativeDesktop) {
+      setStatus('connected');
+      setMessage('Built-in ZARA desktop runtime connected');
+      return;
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -161,7 +174,7 @@ export function DesktopBridgePanel() {
           {status === 'connected' ? 'Connected' : status === 'offline' ? 'Offline' : 'Not paired'}
         </span>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      {!isNativeDesktop && <div className="flex flex-col gap-2 sm:flex-row">
         <input
           aria-label="Desktop companion pairing token"
           type="password"
@@ -179,7 +192,7 @@ export function DesktopBridgePanel() {
         >
           <Link2 className="h-3.5 w-3.5" /> Pair
         </button>
-      </div>
+      </div>}
       <div className="mt-2 flex flex-wrap gap-1.5">
         <button
           type="button"
@@ -234,15 +247,15 @@ export function DesktopBridgePanel() {
         >
           List Downloads
         </button>
-        <button
+        {!isNativeDesktop && <button
           type="button"
           onClick={() => void inspectUsbDrives()}
           disabled={busy || !token.trim()}
           className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:border-cyan-500/40 hover:text-cyan-200 disabled:opacity-40"
         >
           <Usb className="h-3 w-3" /> Scan USB
-        </button>
-        <button
+        </button>}
+        {!isNativeDesktop && <button
           type="button"
           onClick={() => {
             localStorage.removeItem(TOKEN_KEY);
@@ -254,7 +267,7 @@ export function DesktopBridgePanel() {
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:text-rose-300"
         >
           <Unplug className="h-3 w-3" /> Unpair
-        </button>
+        </button>}
       </div>
       {message && (
         <p role="status" className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-300">
