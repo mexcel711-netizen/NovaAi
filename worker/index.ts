@@ -8,7 +8,7 @@ import { handleFeatureRoute } from './features';
 interface D1Statement { bind(...v:unknown[]):D1Statement; all<T>():Promise<{results:T[]}>; first<T>():Promise<T|null>; run():Promise<unknown>; }
 interface DB { prepare(sql:string):D1Statement; }
 interface Env { DB:DB; AI?:{run(model:string,input:{messages:Array<{role:string;content:string}>;max_tokens?:number;temperature?:number}):Promise<{response?:string;choices?:Array<{message?:{content?:string}}>}>}; ASSETS:{fetch(r:Request):Promise<Response>}; GEMINI_API_KEY?:string; CLOUDFLARE_MODEL?:string; }
-const DEFAULT:AppConfig={assistant_name:'ZARA',personality:'warm_urdu_companion',custom_prompt:'Tum ZARA ho — real-life best friend. Roman Urdu mein seedha, chhota aur dostana baat karo. User ko Boss kaho.',language:'bilingual',response_tone:'casual',tts_voice:'ur-PK-UzmaNeural',voice_speed:1,voice_volume:1,stt_model:'base',wake_word:'hey zara',wake_word_enabled:false,auto_speak:true,deep_thinking_mode:'auto',default_model:'gemini-4-hydrogen',ai_provider:'auto',active_mood:'auto',active_character_id:1,hands_free_mode:false,camera_awareness_enabled:false,hairstyle:'wavy',user_name:'Boss',user_nickname:'Boss',assistant_age:'21',onboarding_completed:false,whatsapp_number:'',referral_source:''};
+const DEFAULT:AppConfig={assistant_name:'ZARA',personality:'warm_urdu_companion',custom_prompt:'Tum ZARA ho — real-life best friend. Roman Urdu mein seedha, chhota aur dostana baat karo. User ko Boss kaho.',language:'bilingual',response_tone:'casual',tts_voice:'ur-PK-UzmaNeural',voice_speed:1,voice_volume:1,stt_model:'base',wake_word:'hey zara',wake_word_enabled:false,auto_speak:true,deep_thinking_mode:'auto',default_model:'gemini-4-hydrogen',ai_provider:'auto',active_mood:'auto',active_character_id:2,hands_free_mode:false,camera_awareness_enabled:false,hairstyle:'wavy',user_name:'Boss',user_nickname:'Boss',assistant_age:'21',onboarding_completed:false,whatsapp_number:'',referral_source:''};
 const json=(x:unknown,s=200)=>Response.json(x,{status:s,headers:{'Cache-Control':'no-store'}});
 const all=async<T>(db:DB,q:string,...v:unknown[]) => (await db.prepare(q).bind(...v).all<T>()).results;
 const one=async<T>(db:DB,q:string,...v:unknown[]) => db.prepare(q).bind(...v).first<T>();
@@ -29,12 +29,12 @@ const [memories,notes,reminders] = await Promise.all([
 ]);
 let activeCharacter:any=null;
 let knowledge:any[]=[];
-try { activeCharacter=await one<any>(db,'SELECT * FROM characters WHERE is_active=1 ORDER BY id LIMIT 1'); } catch { /* migration not applied yet */ }
+try { activeCharacter=await one<any>(db,'SELECT * FROM characters WHERE id=? LIMIT 1',cfg.active_character_id); } catch { /* migration not applied yet */ }
 try { knowledge=await all<any>(db,'SELECT title,goal,detailed_summary,action_plan FROM knowledge_sources ORDER BY id DESC LIMIT 6'); } catch { /* optional study library */ }
 
 const traits = activeCharacter ? arr(activeCharacter.learned_traits) : [];
 const nickname = cfg.user_nickname || cfg.user_name || 'Boss';
-const persona = String(activeCharacter?.system_prompt || cfg.custom_prompt || 'You are NOVA, a helpful Pakistani AI companion.');
+const persona = String(activeCharacter?.system_prompt || cfg.custom_prompt || 'You are ZARA, a helpful Pakistani AI companion.');
 const languageStyle = lang === 'ur'
   ? 'The user is speaking Urdu/Roman Urdu. Reply in natural Pakistani conversational Urdu/Roman Urdu, matching the script they used. Do not switch to stiff English.'
   : 'The user is speaking English. Reply in natural, warm English. Use Pakistani expressions only when they fit naturally.';
@@ -105,8 +105,8 @@ if(cfg.ai_provider==='google-ai-studio'&&env.GEMINI_API_KEY)completed=await runG
 if(!completed)completed=await runCloudflare();
 if(!completed&&env.GEMINI_API_KEY)completed=await runGemini();
 if(!completed||!raw.trim()){
-  console.error('NOVA AI provider chain exhausted:',providerErrors.join(' | '));
-  return json({error:'NOVA ke AI servers filhaal busy hain. Aap ka message save ho gaya hai—please dobara try karein.'},503);
+  console.error('ZARA AI provider chain exhausted:',providerErrors.join(' | '));
+  return json({error:'ZARA ke AI servers filhaal busy hain. Aap ka message save ho gaya hai—please dobara try karein.'},503);
 }
 const parsed=extractEmotionAndCleanText(raw),language=detectUrduIntent(parsed.cleanText)?'ur':lang;
 await save(db,{sessionId,role:'assistant',content:parsed.cleanText,language,emotion:parsed.emotion,modelUsed:model,providerUsed:provider,thinkingUsed:thinking});
@@ -134,7 +134,7 @@ if(p==='/api/tts'&&m==='POST'){
     try{audioBase64=await synthesizeUzmaInWorker(text,30000);break;}
     catch(error){lastError=error instanceof Error?error.message:lastError;if(attempt===0)await new Promise(resolve=>setTimeout(resolve,400));}
   }
-  if(!audioBase64)return json({error:lastError},503);
+  if(!audioBase64){console.error(JSON.stringify({path:'/api/tts',voice:'ur-PK-UzmaNeural',attempts:2,textLength:text.length,error:lastError}));return json({error:lastError},503);}
   return json({audioChunks:[{audioBase64,mimeType:'audio/mpeg'}],engine:'edge-neural-v2',voice:'ur-PK-UzmaNeural'});
 }
 if(p.startsWith('/api/'))return json({error:'Not found'},404);return env.ASSETS.fetch(request);
