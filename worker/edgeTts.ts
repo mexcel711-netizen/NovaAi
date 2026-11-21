@@ -79,10 +79,13 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
   url.searchParams.set('Sec-MS-GEC-Version', `2-${EDGE_TTS_CHROMIUM_VERSION}`);
 
   const major = EDGE_TTS_CHROMIUM_VERSION.split('.')[0];
+  // Cloudflare Workers' fetch API performs WebSocket upgrades over HTTPS URLs.
+  // The upstream endpoint is advertised as WSS, so translate the scheme for
+  // the HTTP Upgrade handshake; passing a wss:// URL directly to fetch fails.
+  url.protocol = 'https:';
   const response = (await fetch(url.toString(), {
     headers: {
       Upgrade: 'websocket',
-      'Sec-WebSocket-Version': '13',
       'User-Agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/${major}.0.0.0 Safari/537.36 Edg/${major}.0.0.0`,
       Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
       'Accept-Language': 'en-US,en;q=0.9',
