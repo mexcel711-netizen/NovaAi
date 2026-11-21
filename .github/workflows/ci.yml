@@ -19,3 +19,26 @@ jobs:
       - run: bun run lint
       - run: bun run test
       - run: bun run build
+      - run: node --check desktop-electron/main.cjs
+      - run: node --check desktop-electron/preload.cjs
+      - run: node -e "JSON.parse(require('node:fs').readFileSync('desktop-electron/package.json', 'utf8'))"
+
+  desktop-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install desktop dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: desktop-electron
+      - name: Build Windows installer
+        run: npm run dist:win
+        working-directory: desktop-electron
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zara-ai-windows-installer
+          path: desktop-electron/release/*.exe
+          if-no-files-found: error
+          retention-days: 14

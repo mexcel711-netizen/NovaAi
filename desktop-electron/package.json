@@ -1,0 +1,65 @@
+{
+  "name": "zara-ai-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZARA AI native desktop shell",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "release:win": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.7.1"
+  },
+  "devDependencies": {
+    "electron": "^41.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.mexcel711.zara-ai",
+    "productName": "ZARA AI",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../desktop-companion/agent.mjs",
+        "to": "desktop-companion/agent.mjs"
+      },
+      {
+        "from": "../SOUL.md",
+        "to": "SOUL.md"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mexcel711-netizen",
+        "repo": "NovaAi",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

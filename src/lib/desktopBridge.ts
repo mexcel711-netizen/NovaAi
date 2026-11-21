@@ -1,6 +1,25 @@
 export const TOKEN_KEY = 'nova-desktop-bridge-token';
 
+declare global {
+  interface Window {
+    zaraDesktop?: {
+      launchApp: (appName: string) => Promise<unknown>;
+      openChromeNewTab: (url?: string) => Promise<unknown>;
+      searchInChrome: (query: string) => Promise<unknown>;
+      openLocation: (location: string) => Promise<unknown>;
+      listFiles: (location: string) => Promise<{ path?: string; entries?: Array<{ name: string; type: 'dir' | 'file' }> }>;
+      getSystemInfo: () => Promise<{
+        hostname: string; platform: string; cpuCount: number; cpuModel: string;
+        totalMemoryGb: number; freeMemoryGb: number; uptimeMinutes: number;
+      }>;
+      getRuntimeInfo: () => Promise<{ version: string; platform: string; dataDir: string; bridgeReady: boolean }>;
+      openExternal: (url: string) => Promise<unknown>;
+    };
+  }
+}
+
 export function getDesktopBridgeToken(): string {
+  if (typeof window !== 'undefined' && window.zaraDesktop) return 'native-desktop-runtime';
   try {
     return localStorage.getItem(TOKEN_KEY) || '';
   } catch {
@@ -18,65 +37,49 @@ function requireToken(): string {
   return token;
 }
 
-export async function runDesktopApp(app: string): Promise<void> {
+async function requestCompanion<T>(path: string, body?: unknown, method = 'POST'): Promise<T> {
   const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/launch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ app }),
+  const response = await fetch('http://127.0.0.1:3210' + path, {
+    method,
+    headers: {
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      Authorization: `Bearer ${token}`,
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const data = (await response.json()) as { error?: string };
+  const data = (await response.json()) as T & { error?: string };
   if (!response.ok) throw new Error(data.error || 'Desktop action failed.');
+  return data;
+}
+
+export async function runDesktopApp(app: string): Promise<void> {
+  if (window.zaraDesktop) { await window.zaraDesktop.launchApp(app); return; }
+  await requestCompanion('/v1/launch', { app });
 }
 
 export async function openChromeNewTab(url?: string): Promise<void> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/chrome/new-tab', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(url ? { url } : {}),
-  });
-  const data = (await response.json()) as { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Chrome new tab action failed.');
+  if (window.zaraDesktop) { await window.zaraDesktop.openChromeNewTab(url); return; }
+  await requestCompanion('/v1/chrome/new-tab', url ? { url } : {});
 }
 
 export async function searchInChrome(query: string): Promise<void> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/chrome/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ query }),
-  });
-  const data = (await response.json()) as { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Chrome search failed.');
+  if (window.zaraDesktop) { await window.zaraDesktop.searchInChrome(query); return; }
+  await requestCompanion('/v1/chrome/search', { query });
 }
 
 export async function openDesktopLocation(location: string): Promise<void> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/open-location', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ location }),
-  });
-  const data = (await response.json()) as { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Folder open failed.');
+  if (window.zaraDesktop) { await window.zaraDesktop.openLocation(location); return; }
+  await requestCompanion('/v1/open-location', { location });
 }
 
 export async function listDesktopFiles(
   location: string
 ): Promise<{ path: string; entries: Array<{ name: string; type: 'dir' | 'file' }> }> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/files/list', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ location }),
-  });
-  const data = (await response.json()) as {
-    error?: string;
-    path?: string;
-    entries?: Array<{ name: string; type: 'dir' | 'file' }>;
-  };
-  if (!response.ok) throw new Error(data.error || 'Unable to list laptop folder.');
+  if (window.zaraDesktop) {
+    const data = await window.zaraDesktop.listFiles(location);
+    return { path: data.path || location, entries: data.entries || [] };
+  }
+  const data = await requestCompanion<{ path?: string; entries?: Array<{ name: string; type: 'dir' | 'file' }> }>('/v1/files/list', { location });
   return { path: data.path || location, entries: data.entries || [] };
 }
 
@@ -89,12 +92,8 @@ export async function fetchDesktopSystemInfo(): Promise<{
   freeMemoryGb: number;
   uptimeMinutes: number;
 }> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/system/info', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = (await response.json()) as {
-    error?: string;
+  if (window.zaraDesktop) return window.zaraDesktop.getSystemInfo();
+  return requestCompanion<{
     hostname: string;
     platform: string;
     cpuCount: number;
@@ -102,9 +101,7 @@ export async function fetchDesktopSystemInfo(): Promise<{
     totalMemoryGb: number;
     freeMemoryGb: number;
     uptimeMinutes: number;
-  };
-  if (!response.ok) throw new Error(data.error || 'Unable to read laptop system info.');
-  return data;
+  }>('/v1/system/info', undefined, 'GET');
 }
 
 export interface UsbDriveInfo {
@@ -115,16 +112,10 @@ export interface UsbDriveInfo {
 }
 
 export async function listUsbDrives(): Promise<UsbDriveInfo[]> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/usb/list', {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = (await response.json()) as {
-    error?: string;
-    drives?: UsbDriveInfo[];
-  };
-  if (!response.ok) throw new Error(data.error || 'Unable to scan removable USB drives.');
+  if (window.zaraDesktop) {
+    throw new Error('USB drive controls are not yet exposed by the native desktop shell.');
+  }
+  const data = await requestCompanion<{ drives?: UsbDriveInfo[] }>('/v1/usb/list', undefined, 'GET');
   return data.drives || [];
 }
 
@@ -133,22 +124,13 @@ export async function transferMemoryToUsb(payload: {
   jsonContent: string;
   markdownContent: string;
 }): Promise<{ ok: boolean; drivePath: string; filePath: string; markdownPath: string }> {
-  const token = requireToken();
-  const response = await fetch('http://127.0.0.1:3210/v1/usb/transfer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-  });
-  const data = (await response.json()) as {
-    error?: string;
-    ok?: boolean;
-    drivePath?: string;
-    filePath?: string;
-    markdownPath?: string;
-  };
-  if (!response.ok || !data.filePath) {
-    throw new Error(data.error || 'USB memory transfer failed.');
+  if (window.zaraDesktop) {
+    throw new Error('USB memory transfer is not yet exposed by the native desktop shell.');
   }
+  const data = await requestCompanion<{
+    ok?: boolean; drivePath?: string; filePath?: string; markdownPath?: string;
+  }>('/v1/usb/transfer', payload);
+  if (!data.filePath) throw new Error('USB memory transfer failed.');
   return {
     ok: true,
     drivePath: data.drivePath || payload.drivePath,
@@ -156,4 +138,3 @@ export async function transferMemoryToUsb(payload: {
     markdownPath: data.markdownPath || '',
   };
 }
-
