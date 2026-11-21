@@ -99,6 +99,9 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
   }
 
   const socket = response.webSocket;
+  // Workers defaults binary WebSocket messages to Blob on modern compatibility dates.
+  // This parser consumes ArrayBuffer frames, so request that representation explicitly.
+  socket.binaryType = 'arraybuffer';
   const audio: Uint8Array[] = [];
   return await new Promise<string>((resolve, reject) => {
     let settled = false;
