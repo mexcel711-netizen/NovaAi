@@ -35,6 +35,7 @@ export function SettingsView({
   const [savedToast, setSavedToast] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [voicePreviewError, setVoicePreviewError] = useState<string | null>(null);
 
   const [micTesting, setMicTesting] = useState(false);
   const [micTestLevel, setMicTestLevel] = useState(0);
@@ -121,8 +122,9 @@ export function SettingsView({
       setPreviewPlaying(false);
       return;
     }
+    setVoicePreviewError(null);
     setPreviewPlaying(true);
-    await speakText({
+    const result = await speakText({
       text: `Arre ${draft.user_nickname || 'Boss'}! Main ${draft.assistant_name} bol rahi hoon... mood kaisa hai aaj?`,
       voiceName: draft.tts_voice,
       language: 'ur',
@@ -131,6 +133,9 @@ export function SettingsView({
       voiceVolume: draft.voice_volume,
       onEnd: () => setPreviewPlaying(false),
     });
+    if (result.engine === 'voice-unavailable') {
+      setVoicePreviewError(result.error || 'Pakistani Urdu voice playback failed.');
+    }
   };
 
   const shareUrl = typeof window !== 'undefined' ? window.location.origin : '';
