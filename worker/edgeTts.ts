@@ -41,13 +41,13 @@ function speechConfigMessage(): string {
   return [
     'Content-Type: application/json; charset=utf-8',
     'Path: speech.config',
-    `X-Timestamp: ${new Date().toUTCString()}`,
+    `X-Timestamp: ${new Date().toISOString()}`,
     '',
     JSON.stringify({
       context: {
         synthesis: {
           audio: {
-            metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: false },
+            metadataoptions: { sentenceBoundaryEnabled: 'false', wordBoundaryEnabled: 'false' },
             outputFormat: OUTPUT_FORMAT,
           },
         },
@@ -65,7 +65,7 @@ function ssmlMessage(text: string, requestId: string): string {
     .replace(/([.!?؟۔])\s+/g, '$1<break time="230ms"/>');
   return [
     `X-RequestId: ${requestId}`,
-    `X-Timestamp: ${new Date().toUTCString()}`,
+    `X-Timestamp: ${new Date().toISOString()}`,
     'Content-Type: application/ssml+xml',
     'Path: ssml',
     '',
@@ -84,6 +84,7 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
   url.searchParams.set('Ocp-Apim-Subscription-Key', EDGE_TTS_TRUSTED_CLIENT_TOKEN);
   url.searchParams.set('Sec-MS-GEC', secMsGec);
   const connectionId = crypto.randomUUID().replace(/-/g, '').toLowerCase();
+  const requestId = crypto.randomUUID().replace(/-/g, '').toLowerCase();
   url.searchParams.set('ConnectionId', connectionId);
   url.searchParams.set('Sec-MS-GEC-Version', `2-${EDGE_TTS_CHROMIUM_VERSION}`);
 
@@ -185,7 +186,7 @@ export async function synthesizeUzmaInWorker(text: string, timeoutMs = 30000): P
     socket.accept();
     try {
       socket.send(speechConfigMessage());
-      socket.send(ssmlMessage(cleanText, connectionId));
+      socket.send(ssmlMessage(cleanText, requestId));
     } catch (error) {
       finish(error instanceof Error ? error : new Error('Unable to start Urdu voice synthesis.'));
     }
