@@ -310,7 +310,7 @@ export function SettingsView({
               <div>
                 <p className="text-sm font-medium text-white">Auto-Speak Every Response</p>
                 <p className="text-xs text-slate-400">
-                  Automatically speak NOVA&apos;s Urdu and English replies with synchronized lip movement.
+                  Automatically speak ZARA&apos;s Urdu and English replies with synchronized lip movement.
                 </p>
               </div>
               <button
@@ -342,7 +342,7 @@ export function SettingsView({
               >
                 Fixed Pakistani Female Neural Voice
               </label>
-              <p className="mt-1 text-xs leading-relaxed text-cyan-200/75">NOVA ka speaker lock hai: Microsoft Edge Neural ur-PK-UzmaNeural. Urdu, English, mood ya character change honay par bhi awaaz nahi badlay gi. Audio service unavailable ho to NOVA doosri system voice par switch nahi karegi.</p>
+              <p className="mt-1 text-xs leading-relaxed text-cyan-200/75">ZARA ka speaker lock hai: Microsoft Edge Neural ur-PK-UzmaNeural. Urdu, English, mood ya character change honay par bhi awaaz nahi badlay gi. Audio service unavailable ho to ZARA doosri system voice par switch nahi karegi.</p>
               <div className="mt-1.5 flex flex-wrap items-center gap-3">
                 <select
                   disabled
@@ -473,7 +473,7 @@ export function SettingsView({
               <div>
                 <p className="text-sm font-medium text-white">Hands-Free Continuous Voice Loop</p>
                 <p className="text-xs text-slate-400">
-                  Automatically resume listening right after NOVA finishes speaking a response.
+                  Automatically resume listening right after ZARA finishes speaking a response.
                 </p>
               </div>
               <button
@@ -544,7 +544,7 @@ export function SettingsView({
                     Installable App &amp; Shareable Laptop Package
                   </h2>
                   <p className="mt-1 text-xs text-slate-400">
-                    Install NOVA directly onto your laptop/desktop, or share the link &amp; setup script so anyone can run it on their own computer.
+                    Install ZARA directly onto your laptop/desktop, or share the link &amp; setup script so anyone can run it on their own computer.
                   </p>
                 </div>
                 <PWAInstallButton />
@@ -553,7 +553,7 @@ export function SettingsView({
               <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-[#111827] p-3">
                 <Share2 className="h-4 w-4 text-cyan-400 shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-200">
-                  {shareUrl || 'https://your-nova-app-url'}
+                  {shareUrl || 'https://your-zara-app-url'}
                 </span>
                 <button
                   type="button"
@@ -575,7 +575,7 @@ export function SettingsView({
                 <div className="mt-3 flex flex-wrap gap-2.5">
                   <a
                     href="/api/desktop/installer?os=win"
-                    download="NOVA-Desktop-Setup.bat"
+                    download="ZARA-Desktop-Setup.bat"
                     className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400 px-3.5 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -583,7 +583,7 @@ export function SettingsView({
                   </a>
                   <a
                     href="/api/desktop/installer?os=unix"
-                    download="nova-desktop-setup.sh"
+                    download="zara-desktop-setup.sh"
                     className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-xs font-medium text-cyan-200 transition-colors hover:bg-cyan-500/20"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -591,7 +591,7 @@ export function SettingsView({
                   </a>
                   <a
                     href="/api/desktop/installer?os=agent"
-                    download="nova-agent.mjs"
+                    download="zara-agent.mjs"
                     className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40"
                   >
                     <Download className="h-3.5 w-3.5" />
