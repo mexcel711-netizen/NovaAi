@@ -55,7 +55,6 @@ const prompt = [
   knowledge.length ? 'Study library context:\n' + knowledge.map(x=>`- ${x.title}: ${String(x.detailed_summary || '').slice(0,1800)}`).join('\n') : '',
 ].filter(Boolean).join('\n\n');
 
-const status=resolveActiveAiProvider({preference:cfg.ai_provider,hasCloudflareBinding:!!env.AI,hasCloudflareRest:false,hasGoogleAiKey:!!env.GEMINI_API_KEY});
 const thinking=!!b.forceThinking||cfg.deep_thinking_mode==='always'||(cfg.deep_thinking_mode==='auto'&&isComplexThinkingQuery(msg));
 let raw='',model='',provider='',providerErrors:string[]=[];
 const runGemini=async():Promise<boolean>=>{
