@@ -93,7 +93,15 @@ export async function fetchDesktopSystemInfo(): Promise<{
   uptimeMinutes: number;
 }> {
   if (window.zaraDesktop) return window.zaraDesktop.getSystemInfo();
-  return requestCompanion('/v1/system/info', undefined, 'GET');
+  return requestCompanion<{
+    hostname: string;
+    platform: string;
+    cpuCount: number;
+    cpuModel: string;
+    totalMemoryGb: number;
+    freeMemoryGb: number;
+    uptimeMinutes: number;
+  }>('/v1/system/info', undefined, 'GET');
 }
 
 export interface UsbDriveInfo {
