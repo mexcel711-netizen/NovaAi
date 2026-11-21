@@ -21,10 +21,15 @@ export function DesktopBridgePanel() {
   const isNativeDesktop = typeof window !== 'undefined' && Boolean(window.zaraDesktop);
 
   useEffect(() => {
-    if (!isNativeDesktop) return;
+    if (!isNativeDesktop || !window.zaraDesktop) return;
     setToken('native desktop runtime');
-    setStatus('connected');
-    setMessage('Built-in ZARA desktop runtime connected');
+    void window.zaraDesktop.getRuntimeInfo().then((info) => {
+      setStatus(info.bridgeReady ? 'connected' : 'offline');
+      setMessage(info.bridgeReady ? 'Built-in ZARA desktop runtime connected' : 'Desktop bridge is not ready');
+    }).catch((error: unknown) => {
+      setStatus('offline');
+      setMessage(error instanceof Error ? error.message : 'Desktop runtime unavailable');
+    });
   }, [isNativeDesktop]);
 
   const connect = async () => {
