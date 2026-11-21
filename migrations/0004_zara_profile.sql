@@ -1,6 +1,13 @@
--- Switch the built-in assistant identity from the legacy NOVA profile to ZARA.
+-- Switch the built-in assistant identity from the archived profile to ZARA.
 -- Preserve all conversations, memories, settings, and character progress.
-UPDATE characters SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE slug = 'nova';
+UPDATE characters SET
+  name = 'ZARA Archive',
+  role_title = 'Archived Assistant Profile',
+  bio = 'Archived original profile retained for continuity; ZARA is the active personal assistant.',
+  system_prompt = 'You are ZARA, an archived profile retained for continuity.',
+  is_active = 0,
+  updated_at = CURRENT_TIMESTAMP
+WHERE slug = 'nova';
 UPDATE characters SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE slug = 'zara';
 
 INSERT INTO app_config (key, value, updated_at) VALUES
