@@ -29,6 +29,12 @@ export function RecentView({
   });
 
   useEffect(() => {
+    if (!selectedSessionId && sessions.length > 0) {
+      setSelectedSessionId(sessions[0].session_id);
+    }
+  }, [sessions, selectedSessionId]);
+
+  useEffect(() => {
     if (!selectedSessionId) {
       setTranscript([]);
       return;
@@ -36,10 +42,18 @@ export function RecentView({
     let cancelled = false;
     setLoadingTranscript(true);
     fetch(`/api/conversations/${encodeURIComponent(selectedSessionId)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to load transcript');
+        return r.json();
+      })
       .then((data: { messages?: ChatMessage[] }) => {
         if (!cancelled) {
           setTranscript(data.messages ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTranscript([]);
         }
       })
       .finally(() => {

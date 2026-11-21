@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { CheckCircle2, FolderOpen, Link2, Monitor, Play, Terminal, Unplug } from 'lucide-react';
+import { CheckCircle2, FolderOpen, Link2, Monitor, Play, Terminal, Unplug, Usb } from 'lucide-react';
 
 import {
   fetchDesktopSystemInfo,
   getDesktopBridgeToken,
   listDesktopFiles,
+  listUsbDrives,
   openChromeNewTab,
   openDesktopLocation,
   runDesktopApp,
@@ -119,6 +120,26 @@ export function DesktopBridgePanel() {
     }
   };
 
+  const inspectUsbDrives = async () => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const drives = await listUsbDrives();
+      setStatus('connected');
+      setFileListing(drives.map((d) => `[USB] ${d.label} (${d.path})`));
+      setMessage(
+        drives.length > 0
+          ? `Detected ${drives.length} removable USB drive(s)`
+          : 'No removable USB drive detected on companion laptop'
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'USB scan failed');
+      setStatus('offline');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section
       className="mt-4 w-full rounded-xl border border-cyan-500/20 bg-slate-950/70 p-3 text-left shadow-[0_0_28px_rgba(0,190,230,0.05)]"
@@ -212,6 +233,14 @@ export function DesktopBridgePanel() {
           className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:border-cyan-500/40 hover:text-cyan-200 disabled:opacity-40"
         >
           List Downloads
+        </button>
+        <button
+          type="button"
+          onClick={() => void inspectUsbDrives()}
+          disabled={busy || !token.trim()}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300 hover:border-cyan-500/40 hover:text-cyan-200 disabled:opacity-40"
+        >
+          <Usb className="h-3 w-3" /> Scan USB
         </button>
         <button
           type="button"

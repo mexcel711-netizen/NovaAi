@@ -328,6 +328,7 @@ export function OnboardingFlow({
   const [step6WordCount, setStep6WordCount] = useState(8);
   const [voiceNotePlaying, setVoiceNotePlaying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [musicOn, setMusicOn] = useState(false);
 
   const [avatarState, setAvatarState] = useState<AvatarState>('idle');
@@ -337,6 +338,18 @@ export function OnboardingFlow({
 
   const ambientCtxRef = useRef<AudioContext | null>(null);
   const ambientGainRef = useRef<GainNode | null>(null);
+  const stageTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (stageTimerRef.current !== null) {
+        window.clearTimeout(stageTimerRef.current);
+      }
+      if (ambientCtxRef.current) {
+        void ambientCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
 
   const displayBotName = assistantName.trim() || 'ZARA';
 
@@ -352,7 +365,7 @@ export function OnboardingFlow({
       try {
         await speakText({
           text,
-          voiceName: characterGender === 'male' ? 'Puck' : 'Zephyr',
+          voiceName: characterGender === 'male' ? 'ur-PK-AsadNeural' : 'ur-PK-UzmaNeural',
           language: 'ur',
           emotion,
           voiceSpeed: 1.0,
@@ -486,8 +499,12 @@ export function OnboardingFlow({
       qStage === 'step7q1' ? 'step7q2' : qStage === 'step7q2' ? 'step7q3' : 'step9';
 
     await speakLine(opt.reaction, 'love');
-    setTimeout(() => {
+    if (stageTimerRef.current !== null) {
+      window.clearTimeout(stageTimerRef.current);
+    }
+    stageTimerRef.current = window.setTimeout(() => {
       setStage((current) => (current === qStage ? nextStage : current));
+      stageTimerRef.current = null;
     }, 350);
   };
 
@@ -509,6 +526,7 @@ export function OnboardingFlow({
   const handleActivate = async () => {
     unlockAudioContext();
     stopAllSpeech();
+    setSubmitError(null);
     setIsSubmitting(true);
     try {
       const qAnswers = QUESTIONS.map((q) => ({
@@ -528,6 +546,8 @@ export function OnboardingFlow({
         userNickname: userNickname.trim() || userName.trim() || 'Boss',
         answers: qAnswers,
       });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Unable to wake assistant right now.');
     } finally {
       setIsSubmitting(false);
     }
@@ -716,7 +736,7 @@ export function OnboardingFlow({
                 ))}
               </div>
 
-              <p className="text-xs text-slate-400">Click any persona to hear her real voice:</p>
+              <p className="text-xs text-slate-400">Click any persona to hear their real voice:</p>
 
               <div className="space-y-2">
                 {CHARACTER_PRESETS.map((preset) => {
@@ -1264,8 +1284,8 @@ export function OnboardingFlow({
                       (h, idx) => (
                         <span
                           key={idx}
-                          className={`w-1 rounded-full bg-cyan-400/75 transition-all ${
-                            voiceNotePlaying ? 'animate-pulse' : ''
+                          className={`w-1 rounded-full transition-colors ${
+                            voiceNotePlaying ? 'bg-cyan-300' : 'bg-cyan-400/75'
                           }`}
                           style={{ height: `${h}px` }}
                         />
@@ -1331,6 +1351,11 @@ export function OnboardingFlow({
                 <span>{isSubmitting ? 'WAKING...' : `ACTIVATE ${displayBotName.toUpperCase()}`}</span>
                 <span aria-hidden="true">→</span>
               </button>
+              {submitError && (
+                <p role="alert" className="mt-2 text-xs text-rose-400">
+                  {submitError}
+                </p>
+              )}
             </div>
           </div>
         )}

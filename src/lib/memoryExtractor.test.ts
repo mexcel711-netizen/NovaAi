@@ -70,3 +70,19 @@ test('isTodayIso accurately identifies same-day timestamps', () => {
   assert.equal(isTodayIso(sameDay, ref), true);
   assert.equal(isTodayIso(prevDay, ref), false);
 });
+
+test('extractMemoriesFromUtterance handles Urdu script continuous memory statements', () => {
+  const urFact = extractMemoriesFromUtterance('میرا نام علی ہے اور میں لاہور میں رہتا ہوں');
+  assert.equal(urFact.some((m) => m.key === 'user_name' && m.value.includes('علی')), true);
+  assert.equal(urFact.some((m) => m.key === 'user_location' && m.value.includes('لاہور')), true);
+
+  const urExplicit = extractMemoriesFromUtterance('میموری میں محفوظ کرو: کل صبح 9 بجے میٹنگ ہے');
+  assert.equal(
+    urExplicit.some((m) => m.key === 'remembered_fact' && m.value.includes('میٹنگ')),
+    true
+  );
+
+  const urPref = extractMemoriesFromUtterance('مجھے سبز چائے پسند ہے');
+  assert.equal(urPref.some((m) => m.key === 'user_preference' && m.value.includes('سبز چائے')), true);
+});
+

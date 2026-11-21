@@ -23,6 +23,7 @@ import {
   Send,
   Settings as SettingsIcon,
   Sparkles,
+  Square,
   Trash2,
   Upload,
   UserCheck,
@@ -31,6 +32,12 @@ import {
   X,
 } from 'lucide-react';
 import type { CameraAwarenessState } from '../../lib/useCameraAwareness';
+import {
+  FEMALE_VOICE_OPTIONS,
+  MALE_VOICE_OPTIONS,
+  getVoicePreviewSample,
+} from '../../lib/voiceCatalog';
+import { speakText, stopAllSpeech, unlockAudioContext } from '../../lib/voiceService';
 import type {
   AppConfig,
   AvatarState,
@@ -81,6 +88,8 @@ interface HomeViewProps {
   requestedHubTab?: 'visual' | 'study' | 'skills' | 'voice' | null;
   errorBanner: string | null;
   warningBanner: string | null;
+  pendingVoiceReplay?: boolean;
+  onPlayPendingVoice?: () => void;
   onNavigate: (page: SidebarPage) => void;
   onInputChange: (val: string) => void;
   onSelectMood: (mood: MoodMode) => void;
@@ -169,6 +178,8 @@ export function HomeView({
   requestedHubTab,
   errorBanner,
   warningBanner,
+  pendingVoiceReplay = false,
+  onPlayPendingVoice,
   onNavigate,
   onInputChange,
   onSelectMood,
@@ -218,6 +229,7 @@ export function HomeView({
   const [quickNoteText, setQuickNoteText] = useState('');
   const [quickRemText, setQuickRemText] = useState('');
   const [quickRemTime, setQuickRemTime] = useState('06:00 PM');
+  const [hubVoiceTesting, setHubVoiceTesting] = useState(false);
 
   useEffect(() => {
     if (knowledge.length > 0 && !knowledge.some((k) => k.id === selectedStudyId)) {
@@ -281,10 +293,8 @@ export function HomeView({
     const text = inputValue.trim() || `Read "${chatAttachment?.title}" and tell me key takeaways + next task.`;
     const att = chatAttachment || undefined;
     setChatAttachment(null);
+    onInputChange('');
     onSendMessage(text, att);
-    if (!inputValue.trim()) {
-      onInputChange('');
-    }
   };
 
   const handleChatFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -307,6 +317,12 @@ export function HomeView({
   const handleStudyFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setStudyError('File must be under 8 MB.');
+      e.target.value = '';
+      return;
+    }
+    setStudyError(null);
     if (!studyTitle.trim()) {
       setStudyTitle(file.name.replace(/\.[^.]+$/, ''));
     }
@@ -321,9 +337,11 @@ export function HomeView({
     } else {
       const buffer = await file.arrayBuffer();
       const bytes = new Uint8Array(buffer);
-      let bin = '';
-      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-      setStudyFileBase64(btoa(bin));
+      const chunks: string[] = [];
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        chunks.push(String.fromCharCode(...bytes.subarray(i, i + 0x8000)));
+      }
+      setStudyFileBase64(btoa(chunks.join('')));
       setStudyFileMime(file.type || 'application/pdf');
       if (!studyContent.trim()) {
         setStudyContent(`Uploaded ${file.name} (${Math.round(file.size / 1024)} KB)`);
@@ -704,6 +722,7 @@ export function HomeView({
                 micLevel={micLevel}
                 lipOpenness={lipOpenness}
                 lipWidth={lipWidth}
+                deepThinking={forceThinking || config.deep_thinking_mode === 'always'}
               />
 
               {/* Sleek Frosted Voice & Power Dock */}
@@ -1128,11 +1147,71 @@ export function HomeView({
           {/* Tab 4: Live Voice Tuning */}
           {centerTab === 'voice' && (
             <div className="mt-3 flex flex-col justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800/90 bg-[#0A1322] p-2.5">
+                <label htmlFor="hub-voice-persona" className="text-xs font-medium text-slate-300 shrink-0">
+                  Voice (Female / Male):
+                </label>
+                <select
+                  id="hub-voice-persona"
+                  value={config.tts_voice}
+                  onChange={(e) => {
+                    unlockAudioContext();
+                    void onSaveConfig({ tts_voice: e.target.value });
+                  }}
+                  className="min-w-0 flex-1 rounded-md border border-slate-700/80 bg-[#0F1A2E] px-2.5 py-1.5 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                >
+                  <optgroup label="Female Voices (Realistic)">
+                    {FEMALE_VOICE_OPTIONS.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Male Voices (Realistic)">
+                    {MALE_VOICE_OPTIONS.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    unlockAudioContext();
+                    if (hubVoiceTesting) {
+                      stopAllSpeech();
+                      setHubVoiceTesting(false);
+                      return;
+                    }
+                    setHubVoiceTesting(true);
+                    const sample = getVoicePreviewSample(
+                      config.tts_voice,
+                      config.assistant_name,
+                      config.user_nickname || 'Boss'
+                    );
+                    void speakText({
+                      text: sample.text,
+                      voiceName: config.tts_voice,
+                      language: sample.language,
+                      emotion: 'happy',
+                      voiceSpeed: config.voice_speed,
+                      voiceVolume: config.voice_volume,
+                      onEnd: () => setHubVoiceTesting(false),
+                    });
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-medium text-cyan-200 transition-colors hover:bg-cyan-500/25 whitespace-nowrap shrink-0"
+                >
+                  {hubVoiceTesting ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                  <span>{hubVoiceTesting ? 'Stop' : 'Test Voice'}</span>
+                </button>
+              </div>
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-800/90 bg-[#0A1322] p-3">
                   <div className="flex items-center justify-between text-xs">
                     <label htmlFor="hub-voice-speed" className="font-medium text-slate-200">
-                      Urdu Voice Speed
+                      Voice Speed
                     </label>
                     <span className="font-mono text-cyan-300 tabular-nums">
                       {config.voice_speed.toFixed(2)}x
@@ -1173,7 +1252,9 @@ export function HomeView({
               </div>
 
               <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                <span>Active Voice: {config.tts_voice} · Pakistani Urdu Neural Engine</span>
+                <span>
+                  Auto-Speak: {autoSpeak ? 'ON' : 'Muted'} · Neural Engine Ready
+                </span>
                 <button
                   type="button"
                   onClick={() => onNavigate('settings')}
@@ -1257,8 +1338,8 @@ export function HomeView({
           </button>
         </div>
 
-        {(errorBanner || warningBanner) && (
-          <div className="border-b border-white/[0.07] px-3.5 py-2 text-xs">
+        {(errorBanner || warningBanner || pendingVoiceReplay) && (
+          <div className="space-y-1.5 border-b border-white/[0.07] px-3.5 py-2 text-xs">
             {errorBanner && (
               <div
                 role="alert"
@@ -1277,6 +1358,19 @@ export function HomeView({
             {warningBanner && !errorBanner && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200">
                 {warningBanner}
+              </div>
+            )}
+            {pendingVoiceReplay && onPlayPendingVoice && (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-cyan-100">
+                <span>Browser paused auto-audio playback.</span>
+                <button
+                  type="button"
+                  onClick={onPlayPendingVoice}
+                  className="inline-flex items-center gap-1 rounded-md bg-cyan-400 px-2.5 py-1 text-[11px] font-semibold text-slate-950 hover:bg-cyan-300 whitespace-nowrap shrink-0"
+                >
+                  <Volume2 className="h-3 w-3" />
+                  <span>Play Voice Reply</span>
+                </button>
               </div>
             )}
           </div>

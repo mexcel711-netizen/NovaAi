@@ -1,5 +1,6 @@
-import type { SkillConfig, SkillExecutionResult } from '../types/nova';
+import type { SidebarPage, SkillConfig, SkillExecutionResult } from '../types/nova';
 import { resolveCharacterSwitchCommand, resolveMoodSwitchCommand } from './characterEngine';
+import { detectUsbTransferIntent } from './usbTransfer';
 
 /**
  * Safely evaluates basic arithmetic expressions (+, -, *, /, %, parentheses)
@@ -233,6 +234,137 @@ export function matchSkillCommand(
     }
   }
 
+  // 1.5. USB Memory Transfer & Auto-Sync Commands (Urdu script, Roman Urdu, English)
+  const usbIntent = detectUsbTransferIntent(input);
+  if (usbIntent) {
+    const hasUrduScript = /[\u0600-\u06FF]/.test(input);
+    if (usbIntent.action === 'enable_auto') {
+      return {
+        matched: true,
+        skillName: 'usb_memory_sync',
+        actionType: 'system',
+        language: isUrdu ? 'ur' : 'en',
+        emotion: 'happy',
+        responseText: hasUrduScript
+          ? 'آٹو یو ایس بی میموری سنک آن کر دیا گیا ہے۔ اب آپ کی ہر نئی یادداشت خود بخود یو ایس بی میں محفوظ ہوتی رہے گی!'
+          : isUrdu
+            ? 'Auto-USB memory transfer on kar diya gaya hai! Ab har nayi memory khud bakhud USB mein transfer hoti rahegi.'
+            : 'Auto-USB memory sync enabled. Newly recorded memories will automatically back up to your USB drive.',
+        sideEffect: {
+          type: 'toggle_auto_usb',
+          autoUsbEnabled: true,
+          driveHint: usbIntent.driveHint,
+        },
+      };
+    }
+    if (usbIntent.action === 'disable_auto') {
+      return {
+        matched: true,
+        skillName: 'usb_memory_sync',
+        actionType: 'system',
+        language: isUrdu ? 'ur' : 'en',
+        emotion: 'calm',
+        responseText: hasUrduScript
+          ? 'آٹو یو ایس بی ٹرانسفر بند کر دیا گیا ہے۔ جب آپ کہیں گی تب ہی مینوئل ٹرانسفر ہو گا۔'
+          : isUrdu
+            ? 'Auto-USB transfer band kar diya gaya hai. Jab aap bolein gi tab manual transfer hoga.'
+            : 'Auto-USB memory sync disabled. You can still transfer manually anytime.',
+        sideEffect: {
+          type: 'toggle_auto_usb',
+          autoUsbEnabled: false,
+        },
+      };
+    }
+    if (usbIntent.action === 'check_status') {
+      return {
+        matched: true,
+        skillName: 'usb_memory_sync',
+        actionType: 'system',
+        language: isUrdu ? 'ur' : 'en',
+        emotion: 'curious',
+        responseText: hasUrduScript
+          ? 'میں ابھی USB ڈرائیو چیک کر رہی ہوں۔'
+          : isUrdu
+            ? 'Abhi connected USB drive check kar rahi hoon.'
+            : 'Checking connected USB storage drives now.',
+        sideEffect: {
+          type: 'check_usb',
+          driveHint: usbIntent.driveHint,
+        },
+      };
+    }
+    return {
+      matched: true,
+      skillName: 'usb_memory_sync',
+      actionType: 'system',
+      language: isUrdu ? 'ur' : 'en',
+      emotion: 'happy',
+      responseText: hasUrduScript
+        ? 'جی، میں آپ کی تمام ریکارڈ شدہ میموری ابھی یو ایس بی میں ٹرانسفر کر رہی ہوں۔'
+        : isUrdu
+          ? 'Ji, aap ki tamam recorded memory abhi USB mein transfer kar rahi hoon.'
+          : 'Transferring your full recorded memory vault to USB now.',
+      sideEffect: {
+        type: 'transfer_usb',
+        driveHint: usbIntent.driveHint,
+      },
+    };
+  }
+
+  // 1.6. UI Navigation, New Session & Memory/Note Listing Commands
+  const navTargets: Array<{ page: SidebarPage; pattern: RegExp; labelUr: string; labelEn: string }> = [
+    { page: 'memory', pattern: /^(?:open|show|go to)\s+memor(?:y|ies)$|^(?:memory|memories)\s+(?:kholo|dikhao|open(?:\s+karo)?)$|^(?:میموری)\s*(?:کھولو|دکھاؤ)$/i, labelUr: 'میموری صفحہ کھول دیا گیا ہے۔', labelEn: 'Opened the Memory vault page.' },
+    { page: 'skills', pattern: /^(?:open|show|go to)\s+skills?$|^(?:skills?)\s+(?:kholo|dikhao|open(?:\s+karo)?)$|^(?:اسکلز|مہارتیں)\s*(?:کھولو|دکھاؤ)$/i, labelUr: 'اسکلز صفحہ کھول دیا گیا ہے۔', labelEn: 'Opened the Skills page.' },
+    { page: 'character', pattern: /^(?:open|show|go to)\s+character$|^(?:character)\s+(?:kholo|dikhao|open(?:\s+karo)?)$|^(?:کریکٹر)\s*(?:کھولو|دکھاؤ)$/i, labelUr: 'کریکٹر اسٹوڈیو کھول دیا گیا ہے۔', labelEn: 'Opened the Character Studio.' },
+    { page: 'recent', pattern: /^(?:open|show|go to)\s+(?:recent|history)$|^(?:recent|history)\s+(?:kholo|dikhao|open(?:\s+karo)?)$|^(?:ریسنٹ|ہسٹری)\s*(?:کھولو|دکھاؤ)$/i, labelUr: 'حالیہ گفتگو کا صفحہ کھول دیا گیا ہے۔', labelEn: 'Opened Recent conversations.' },
+    { page: 'settings', pattern: /^(?:open|show|go to)\s+settings?$|^(?:settings?)\s+(?:kholo|dikhao|open(?:\s+karo)?)$|^(?:سیٹنگز)\s*(?:کھولو|دکھاؤ)$/i, labelUr: 'سیٹنگز کھول دی گئی ہیں۔', labelEn: 'Opened Settings.' },
+    { page: 'home', pattern: /^(?:open|go to)\s+home$|^(?:home)\s+(?:kholo|jao)$|^(?:ہوم)\s*(?:کھولو|جاؤ)$/i, labelUr: 'ہوم اسکرین پر آ گئے ہیں۔', labelEn: 'Returned to Home.' },
+  ];
+  for (const nav of navTargets) {
+    if (nav.pattern.test(input)) {
+      const hasUrduScript = /[\u0600-\u06FF]/.test(input);
+      return {
+        matched: true,
+        skillName: 'ui_navigation',
+        actionType: 'system',
+        language: isUrdu ? 'ur' : 'en',
+        emotion: 'happy',
+        responseText: hasUrduScript || isUrdu ? nav.labelUr : nav.labelEn,
+        sideEffect: { type: 'navigate_page', navigatePage: nav.page },
+      };
+    }
+  }
+
+  if (
+    /^(?:new\s+chat|start\s+new\s+chat|fresh\s+chat|naya\s+chat|nayi\s+baat|نئی چیٹ|نیا چیٹ)$/i.test(input)
+  ) {
+    return {
+      matched: true,
+      skillName: 'new_session',
+      actionType: 'system',
+      language: isUrdu ? 'ur' : 'en',
+      emotion: 'happy',
+      responseText: isUrdu ? 'نیا چیٹ سیشن شروع ہو گیا ہے۔' : 'Started a fresh chat session.',
+      sideEffect: { type: 'new_session' },
+    };
+  }
+
+  if (
+    /^(?:show|list|read)\s+(?:my\s+)?memor(?:y|ies)$|^(?:meri\s+)?memor(?:y|ies)\s+(?:batao|sunao)$|^(?:میری\s+)?(?:میموری|یادداشتیں)\s*(?:بتاؤ|سناؤ)$/i.test(
+      input
+    )
+  ) {
+    return {
+      matched: true,
+      skillName: 'memory_recall',
+      actionType: 'system',
+      language: isUrdu ? 'ur' : 'en',
+      emotion: 'happy',
+      responseText: isUrdu ? 'آپ کی محفوظ یادداشتیں نکال رہی ہوں۔' : 'Reading your recorded memories.',
+      sideEffect: { type: 'list_memories' },
+    };
+  }
+
   const isEnabled = (name: string) => {
     const found = skills.find((s) => s.skill_name === name);
     return found ? found.is_enabled : true;
@@ -360,7 +492,8 @@ export function matchSkillCommand(
     isEnabled('study_mentor') &&
     input.length < 110 &&
     (/\b(open study|study lab|read a book|read a course|read software)\b/i.test(lower) ||
-      /^(?:yeh |ye )?(?:book|kitaab|course|software) read (?:karo|kar lo)$/i.test(lower))
+      /^(?:yeh |ye )?(?:book|kitaab|course|software) read (?:karo|kar lo)$/i.test(lower) ||
+      /(اسٹڈی لیب کھولو|کتاب پڑھو|کورس پڑھو)/.test(input))
   ) {
     return {
       matched: true,
@@ -410,7 +543,7 @@ export function matchSkillCommand(
   // 8. Calculator skill
   if (isEnabled('calculator')) {
     const calcMatch = input.match(
-      /(?:^|\b)(?:calc(?:ulate)?|compute|what is|kitna hota hai|hisaab)\s+([0-9+\-*/().%\s×÷,]+)(?:\?|$)/i
+      /(?:^|\b)(?:calc(?:ulate)?|compute|what is|kitna hota hai|hisaab|حساب)\s+([0-9+\-*/().%\s×÷,]+)(?:\?|$)/i
     );
     const candidate = calcMatch ? calcMatch[1].replace(/\?+$/, '').trim() : input;
     if (/[+\-*/%×÷]/.test(candidate) && /\d/.test(candidate)) {
@@ -430,14 +563,15 @@ export function matchSkillCommand(
     }
   }
 
-  // 9. Create Note skill
+  // 9. Create Note skill (English + Roman Urdu + Urdu script)
   if (isEnabled('notes_manager')) {
     const noteMatch =
-      input.match(/^(?:create\s+a?\s*note|take\s+a?\s*note|add\s+note|note)\s*[:\-]?\s+(.+)$/i) ||
-      input.match(/^(?:note\s+likho|likho)\s*[:\-]?\s+(.+)$/i);
+      input.match(/^(?:create\s+a?\s*note|take\s+a?\s*note|add\s+a?\s*note|save\s+a?\s*note|note\s+that|note)\s*[:\-]?\s+(.+)$/i) ||
+      input.match(/^(?:note\s+likho|note\s+banao|note\s+save\s+karo|likho)\s*[:\-]?\s+(.+)$/i) ||
+      input.match(/^(?:نوٹ\s+لکھو|نوٹ\s+بناؤ|نوٹ\s+محفوظ\s+کرو|نوٹ\s+سیو\s+کرو|نوٹ\s+رکھو|لکھو)\s*[:\-]?\s+(.+)$/);
     if (noteMatch && noteMatch[1].trim().length > 0) {
       const content = noteMatch[1].trim();
-      const title = content.split(/[.!?\n]/)[0].slice(0, 48).trim();
+      const title = content.split(/[.!?\n۔]/)[0].slice(0, 48).trim();
       return {
         matched: true,
         skillName: 'notes_manager',
@@ -455,11 +589,13 @@ export function matchSkillCommand(
     }
   }
 
-  // 10. Reminder skill
+  // 10. Reminder skill (English + Roman Urdu + Urdu script)
   if (isEnabled('reminders_manager')) {
     const reminderMatch =
       input.match(/^remind\s+me\s+(?:to\s+)?(.+?)(?:\s+(?:at|on|in)\s+(.+))?$/i) ||
-      input.match(/^(?:yaad\s+dila(?:na|o)|reminder\s+lagao)\s*[:\-]?\s+(.+)$/i);
+      input.match(/^(?:set\s+a?\s*reminder|add\s+a?\s*reminder)\s*(?:to|for)?\s*[:\-]?\s+(.+)$/i) ||
+      input.match(/^(?:yaad\s+dila(?:na|o)|yaad\s+dehani\s+(?:lagao|banao)|reminder\s+(?:lagao|banao|set\s+karo))\s*[:\-]?\s+(.+)$/i) ||
+      input.match(/^(?:یاد\s+دلاؤ|یاد\s+دلانا|یاد\s+دہانی\s+(?:لگاؤ|بناؤ|رکھو|سیٹ\s+کرو)|ریمائنڈر\s+(?:لگاؤ|بناؤ|سیٹ\s+کرو))\s*[:\-]?\s+(.+)$/);
     if (reminderMatch && reminderMatch[1].trim().length > 0) {
       const title = reminderMatch[1].trim();
       const whenRaw = reminderMatch[2]?.trim();
@@ -490,7 +626,8 @@ export function matchSkillCommand(
   if (isEnabled('web_search')) {
     const searchMatch =
       input.match(/^(?:search(?:\s+for)?|google|look\s+up)\s+(.+)$/i) ||
-      input.match(/^(.+?)\s+(?:search\s+karo|dhundo)$/i);
+      input.match(/^(.+?)\s+(?:search\s+karo|dhundo)$/i) ||
+      input.match(/^(.+?)\s+(?:سرچ\s+کرو|تلاش\s+کرو|ڈھونڈو)$/);
     if (searchMatch && searchMatch[1].trim().length > 1) {
       const q = searchMatch[1].trim();
       const url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
@@ -511,7 +648,20 @@ export function matchSkillCommand(
   if (isEnabled('app_launcher')) {
     const openEn = input.match(/^(?:open|launch|start)\s+([a-z0-9.\-_ ]+)$/i);
     const openUr = input.match(/^([a-z0-9.\-_ ]+?)\s+(?:kholo|chalu\s+karo|open\s+karo)$/i);
-    const target = (openEn?.[1] || openUr?.[1])?.trim().toLowerCase();
+    const openUrScript = input.match(/^(یوٹیوب|گوگل|جی میل|گٹ ہب|میپس|کیلنڈر|کروم|نوٹیشن)\s+(?:کھولو|چالو کرو)$/);
+    const urAppMap: Record<string, string> = {
+      'یوٹیوب': 'youtube',
+      'گوگل': 'chrome',
+      'کروم': 'chrome',
+      'جی میل': 'gmail',
+      'گٹ ہب': 'github',
+      'میپس': 'maps',
+      'کیلنڈر': 'calendar',
+      'نوٹیشن': 'notion',
+    };
+    const target = (openEn?.[1] || openUr?.[1] || (openUrScript ? urAppMap[openUrScript[1]] : undefined))
+      ?.trim()
+      .toLowerCase();
     if (target) {
       const known = KNOWN_APPS[target];
       if (known) {
@@ -537,13 +687,19 @@ export function matchSkillCommand(
     }
   }
 
-  // 13. System control skill
+  // 13. System control skill (mute, unmute, voice on/off, volume/brightness)
   if (isEnabled('system_control')) {
     if (
-      /\b(volume\s+(?:up|down)|mute|unmute|brightness\s+(?:up|down)|awaaz\s+(?:kam|zyada|band))\b/i.test(
+      /\b(volume\s+(?:up|down)|mute|unmute|brightness\s+(?:up|down)|awaaz\s+(?:kam|zyada|band|chalu))\b/i.test(
         lower
-      )
+      ) ||
+      /(آواز بند|آواز کھولو|چپ ہو جاؤ|بولنا بند|بولنا شروع)/.test(input)
     ) {
+      const cmdNormalized = /(آواز بند|چپ ہو جاؤ|بولنا بند|awaaz band)/.test(input)
+        ? 'mute'
+        : /(آواز کھولو|بولنا شروع|awaaz chalu)/.test(input)
+          ? 'unmute'
+          : lower;
       return {
         matched: true,
         skillName: 'system_control',
@@ -552,7 +708,7 @@ export function matchSkillCommand(
         responseText: isUrdu
           ? 'Audio aur display control command execute kar di gayi hai.'
           : 'System audio/display control adjusted.',
-        sideEffect: { type: 'system_action', systemCommand: lower },
+        sideEffect: { type: 'system_action', systemCommand: cmdNormalized },
       };
     }
   }

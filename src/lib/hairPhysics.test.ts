@@ -89,14 +89,20 @@ test('computeHairAirWisps produces gentle floating glowing strands for all hairs
       intensity: 1,
     });
 
-    assert.ok(wispsT0.length >= 4, `${style} should generate glowing hair air wisps`);
+    assert.ok(wispsT0.length >= 6, `${style} should generate rich layered glowing hair wisps`);
     assert.equal(wispsT0.length, wispsT1.length);
+
+    // Roots stay anchored to the head while hair tips flow gently in the breeze
+    for (let i = 0; i < wispsT0.length; i++) {
+      assert.equal(wispsT0[i].x0, wispsT1[i].x0, `${style} wisp root x0 must stay anchored`);
+      assert.equal(wispsT0[i].y0, wispsT1[i].y0, `${style} wisp root y0 must stay anchored`);
+    }
 
     const moved = wispsT0.some(
       (w, idx) =>
-        Math.abs(w.x1 - wispsT1[idx].x1) > 0.3 || Math.abs(w.y1 - wispsT1[idx].y1) > 0.3
+        Math.abs(w.x1 - wispsT1[idx].x1) > 0.4 || Math.abs(w.y1 - wispsT1[idx].y1) > 0.3
     );
-    assert.ok(moved, `${style} wisps should drift gently in the air over time`);
+    assert.ok(moved, `${style} wisps should drift smoothly in the air over time`);
 
     for (const w of wispsT0) {
       assert.ok(w.alpha > 0 && w.alpha <= 0.4, `Expected subtle glowing alpha, got ${w.alpha}`);
@@ -105,18 +111,26 @@ test('computeHairAirWisps produces gentle floating glowing strands for all hairs
   }
 });
 
-test('computeVoiceWaveBars stays minimal at silence and rises visibly when talking', () => {
-  const idle = computeVoiceWaveBars({
+test('computeVoiceWaveBars stays completely steady at idle silence and rises when talking', () => {
+  const idleA = computeVoiceWaveBars({
     state: 'idle',
     micLevel: 0,
     lipOpenness: 0,
     phase: 1.2,
     barCount: 15,
   });
-  assert.equal(idle.active, false);
-  assert.equal(idle.energy, 0);
-  assert.equal(idle.bars.length, 15);
-  assert.ok(Math.max(...idle.bars) <= 0.25, `Idle waves should stay low, got ${Math.max(...idle.bars)}`);
+  const idleB = computeVoiceWaveBars({
+    state: 'idle',
+    micLevel: 0,
+    lipOpenness: 0,
+    phase: 3.9,
+    barCount: 15,
+  });
+  assert.equal(idleA.active, false);
+  assert.equal(idleA.energy, 0);
+  assert.equal(idleA.bars.length, 15);
+  assert.deepEqual(idleA.bars, idleB.bars, 'Idle voice bars must remain completely calm with zero idle motion');
+  assert.ok(Math.max(...idleA.bars) <= 0.25, `Idle waves should stay low, got ${Math.max(...idleA.bars)}`);
 
   const speaking = computeVoiceWaveBars({
     state: 'speaking',

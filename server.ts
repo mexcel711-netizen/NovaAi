@@ -27,6 +27,7 @@ import {
   getKnowledgeSources,
   getMemories,
   getNotes,
+  getRecentConversationsForExport,
   getRecentUserMessages,
   getReminders,
   getSessionSummaries,
@@ -56,8 +57,10 @@ import {
   extractEmotionAndCleanText,
   resolveActiveAiProvider,
 } from './src/lib/emotionAndSpeech';
+import { buildLocalConversationalReply } from './src/lib/localBrain';
 import { extractMemoriesFromUtterance } from './src/lib/memoryExtractor';
 import { detectUrduIntent, isComplexThinkingQuery, matchSkillCommand } from './src/lib/skillMatcher';
+import { buildMemoryVaultPayload, formatMemoryVaultMarkdown } from './src/lib/usbTransfer';
 import type {
   ChatApiResponse,
   FacialEmotion,
@@ -70,6 +73,33 @@ import type {
 } from './src/types/nova';
 
 const PORT = 3000;
+const ALLOWED_SKILL_ACTION_TYPES = new Set<SkillActionType>([
+  'launch',
+  'url',
+  'system',
+  'ai',
+  'note',
+  'reminder',
+  'calc',
+  'study',
+  'vision',
+  'evolve',
+  'desktop',
+]);
+
+function parsePositiveId(raw: string): number | null {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function isSafeHttpUrl(raw: string): boolean {
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function getProviderStatus(): ProviderStatus {
   const config = getConfig();
@@ -146,6 +176,23 @@ async function startServer() {
     });
   });
 
+  app.get('/api/memory/export', (_req, res) => {
+    const vault = buildMemoryVaultPayload({
+      config: getConfig(),
+      memories: getMemories(),
+      notes: getNotes(),
+      reminders: getReminders(),
+      knowledge: getKnowledgeSources(),
+      characters: getCharacters(),
+      sessions: getSessionSummaries(),
+      recentConversations: getRecentConversationsForExport(250),
+    });
+    res.json({
+      vault,
+      markdown: formatMemoryVaultMarkdown(vault),
+    });
+  });
+
   app.get('/api/conversations/:sessionId', (req, res) => {
     const messages = getConversationMessages(req.params.sessionId);
     res.json({ messages });
@@ -209,15 +256,26 @@ async function startServer() {
         let detailedSummary = '';
         let actionPlan: string[] = [];
         if (hasGoogleAiKey()) {
-          const analysis = await analyzeStudyMaterial({
-            kind: cleanKind,
-            title: cleanTitle,
-            goal: effectiveMessage,
-            contentText: attachmentText.trim(),
-            config,
-          });
-          detailedSummary = analysis.detailedSummary;
-          actionPlan = analysis.actionPlan;
+          try {
+            const analysis = await analyzeStudyMaterial({
+              kind: cleanKind,
+              title: cleanTitle,
+              goal: effectiveMessage,
+              contentText: attachmentText.trim(),
+              config,
+            });
+            detailedSummary = analysis.detailedSummary;
+            actionPlan = analysis.actionPlan;
+          } catch {
+            const local = buildLocalStructuredStudy({
+              kind: cleanKind,
+              title: cleanTitle,
+              goal: effectiveMessage,
+              contentText: attachmentText.trim(),
+            });
+            detailedSummary = local.detailedSummary;
+            actionPlan = local.actionPlan;
+          }
         } else {
           const local = buildLocalStructuredStudy({
             kind: cleanKind,
@@ -297,6 +355,8 @@ async function startServer() {
           );
       if (skillMatch.matched && skillMatch.responseText) {
         const sideEffect = skillMatch.sideEffect;
+        let finalReply = skillMatch.responseText;
+
         if (sideEffect?.type === 'create_note' && sideEffect.noteContent) {
           addNote(sideEffect.noteTitle ?? 'Quick Note', sideEffect.noteContent, ['voice']);
         } else if (sideEffect?.type === 'create_reminder' && sideEffect.reminderTitle) {
@@ -305,16 +365,31 @@ async function startServer() {
           updateConfig({ active_mood: sideEffect.mood });
         } else if (sideEffect?.type === 'switch_character' && sideEffect.characterSlug) {
           selectCharacterByIdOrSlug(sideEffect.characterSlug);
+        } else if (sideEffect?.type === 'toggle_auto_usb') {
+          updateConfig({ auto_usb_transfer: Boolean(sideEffect.autoUsbEnabled) });
+        } else if (sideEffect?.type === 'list_memories') {
+          const currentMems = getMemories().slice(0, 6);
+          if (currentMems.length > 0) {
+            finalReply =
+              userLang === 'ur'
+                ? `آپ کی محفوظ یادداشتیں (${getMemories().length} کل): ${currentMems.map((m) => m.value).join(' · ')}`
+                : `Your recorded memories (${getMemories().length} total): ${currentMems.map((m) => m.value).join(' · ')}`;
+          } else {
+            finalReply =
+              userLang === 'ur'
+                ? 'ابھی تک کوئی یادداشت محفوظ نہیں ہے۔ اپنا نام، شہر یا کوئی بات بتائیں، میں فوراً محفوظ کر لوں گی۔'
+                : 'No recorded memories yet. Tell me anything about yourself and I will remember it.';
+          }
         }
 
         const replyLang = skillMatch.language ?? userLang;
         const skillEmotion: FacialEmotion =
-          skillMatch.emotion || detectEmotionFromText(skillMatch.responseText);
+          skillMatch.emotion || detectEmotionFromText(finalReply);
 
         saveConversationTurn({
           sessionId: activeSession,
           role: 'assistant',
-          content: skillMatch.responseText,
+          content: finalReply,
           language: replyLang,
           emotion: skillEmotion,
           modelUsed: 'skill-engine',
@@ -324,7 +399,7 @@ async function startServer() {
         });
 
         const payload: ChatApiResponse = {
-          reply: skillMatch.responseText,
+          reply: finalReply,
           emotion: skillEmotion,
           language: replyLang,
           modelUsed: 'skill-engine',
@@ -357,14 +432,6 @@ async function startServer() {
       const knowledge = getKnowledgeSources();
       const providerStatus = getProviderStatus();
 
-      if (providerStatus.activeProvider === 'unconfigured') {
-        res.status(503).json({
-          error:
-            'No AI provider key is configured yet. Add GEMINI_API_KEY in Settings > Secrets for Google AI Studio testing, or deploy to Cloudflare Workers for automatic AI binding.',
-        });
-        return;
-      }
-
       const shouldThink =
         Boolean(forceThinking) ||
         config.deep_thinking_mode === 'always' ||
@@ -379,32 +446,63 @@ async function startServer() {
       let aiNotes: Array<{ title: string; content: string }> = [];
       let aiReminders: Array<{ title: string; remindAt: string }> = [];
 
-      if (providerStatus.activeProvider === 'cloudflare-rest') {
-        const systemInstruction = buildSystemInstruction({
+      if (providerStatus.activeProvider === 'unconfigured') {
+        const localReply = buildLocalConversationalReply({
+          userMessage: effectiveMessage,
           config,
-          memories,
-          notes,
-          reminders,
           activeCharacter: updatedChar || activeCharacter,
-          knowledge,
-          userMessage: effectiveMessage,
-        });
-        const cfResult = await generateCloudflareRestReply({
-          userMessage: effectiveMessage,
-          history,
-          config,
           memories,
           notes,
           reminders,
-          systemInstruction,
+          knowledge,
+          extractedMemoriesCount: extracted.length,
         });
-        const actParsed = stripAndExtractAiActions(cfResult.text);
-        aiNotes = actParsed.aiNotes;
-        aiReminders = actParsed.aiReminders;
-        const parsed = extractEmotionAndCleanText(actParsed.text);
-        replyText = parsed.cleanText;
-        replyEmotion = parsed.emotion;
-        modelUsed = cfResult.modelUsed;
+        replyText = localReply.reply;
+        replyEmotion = localReply.emotion;
+        modelUsed = 'local-companion-brain';
+      } else if (providerStatus.activeProvider === 'cloudflare-rest') {
+        try {
+          const systemInstruction = buildSystemInstruction({
+            config,
+            memories,
+            notes,
+            reminders,
+            activeCharacter: updatedChar || activeCharacter,
+            knowledge,
+            userMessage: effectiveMessage,
+          });
+          const cfResult = await generateCloudflareRestReply({
+            userMessage: effectiveMessage,
+            history,
+            config,
+            memories,
+            notes,
+            reminders,
+            systemInstruction,
+          });
+          const actParsed = stripAndExtractAiActions(cfResult.text);
+          aiNotes = actParsed.aiNotes;
+          aiReminders = actParsed.aiReminders;
+          const parsed = extractEmotionAndCleanText(actParsed.text);
+          replyText = parsed.cleanText;
+          replyEmotion = parsed.emotion;
+          modelUsed = cfResult.modelUsed;
+        } catch (cfErr) {
+          const localReply = buildLocalConversationalReply({
+            userMessage: effectiveMessage,
+            config,
+            activeCharacter: updatedChar || activeCharacter,
+            memories,
+            notes,
+            reminders,
+            knowledge,
+            extractedMemoriesCount: extracted.length,
+          });
+          replyText = localReply.reply;
+          replyEmotion = localReply.emotion;
+          modelUsed = 'local-companion-brain';
+          warning = cfErr instanceof Error ? cfErr.message : 'Cloudflare AI unavailable';
+        }
       } else {
         try {
           const aiResult = await generateNovaReply({
@@ -428,15 +526,28 @@ async function startServer() {
           aiMemories = aiResult.aiMemories;
           warning = aiResult.warning;
         } catch (aiErr) {
-          const nick = config.user_nickname || config.user_name || 'Boss';
           const matchedSource = knowledge.find((k) =>
             effectiveMessage.toLowerCase().includes(k.title.toLowerCase())
           );
-          replyText = matchedSource
-            ? `${nick}, abhi AI server busy tha par "${matchedSource.title}" mere paas saved hai — pehla step: ${matchedSource.action_plan[0] || matchedSource.detailed_summary.slice(0, 140)}`
-            : `${nick}, thoda network load hai abhi — par main sun rahi hoon, dobara bolo ya Study & Notes use karo.`;
-          replyEmotion = 'calm';
-          modelUsed = 'local-graceful-fallback';
+          if (matchedSource) {
+            const nick = config.user_nickname || config.user_name || 'Boss';
+            replyText = `${nick}, "${matchedSource.title}" mere paas saved hai — pehla step: ${matchedSource.action_plan[0] || matchedSource.detailed_summary.slice(0, 140)}`;
+            replyEmotion = 'calm';
+          } else {
+            const localReply = buildLocalConversationalReply({
+              userMessage: effectiveMessage,
+              config,
+              activeCharacter: updatedChar || activeCharacter,
+              memories,
+              notes,
+              reminders,
+              knowledge,
+              extractedMemoriesCount: extracted.length,
+            });
+            replyText = localReply.reply;
+            replyEmotion = localReply.emotion;
+          }
+          modelUsed = 'local-companion-brain';
           warning = aiErr instanceof Error ? aiErr.message : 'Transient upstream model error';
         }
       }
@@ -569,7 +680,12 @@ async function startServer() {
   });
 
   app.delete('/api/characters/:id', (req, res) => {
-    deleteCharacter(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid character id.' });
+      return;
+    }
+    deleteCharacter(id);
     res.json({ ok: true, characters: getCharacters() });
   });
 
@@ -817,7 +933,12 @@ async function startServer() {
   });
 
   app.delete('/api/study/:id', (req, res) => {
-    deleteKnowledgeSource(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid study source id.' });
+      return;
+    }
+    deleteKnowledgeSource(id);
     res.json({ ok: true, knowledge: getKnowledgeSources() });
   });
 
@@ -1011,7 +1132,12 @@ async function startServer() {
   });
 
   app.delete('/api/memories/:id', (req, res) => {
-    deleteMemory(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid memory id.' });
+      return;
+    }
+    deleteMemory(id);
     res.json({ ok: true, memories: getMemories() });
   });
 
@@ -1036,7 +1162,12 @@ async function startServer() {
   });
 
   app.delete('/api/notes/:id', (req, res) => {
-    deleteNote(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid note id.' });
+      return;
+    }
+    deleteNote(id);
     res.json({ ok: true, notes: getNotes() });
   });
 
@@ -1052,13 +1183,23 @@ async function startServer() {
   });
 
   app.patch('/api/reminders/:id', (req, res) => {
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid reminder id.' });
+      return;
+    }
     const { is_done } = req.body as { is_done?: boolean };
-    toggleReminder(Number(req.params.id), Boolean(is_done));
+    toggleReminder(id, Boolean(is_done));
     res.json({ ok: true, reminders: getReminders() });
   });
 
   app.delete('/api/reminders/:id', (req, res) => {
-    deleteReminder(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid reminder id.' });
+      return;
+    }
+    deleteReminder(id);
     res.json({ ok: true, reminders: getReminders() });
   });
 
@@ -1075,24 +1216,43 @@ async function startServer() {
       res.status(400).json({ error: 'Skill name and at least one trigger phrase are required.' });
       return;
     }
+    const resolvedActionType: SkillActionType =
+      action_type && ALLOWED_SKILL_ACTION_TYPES.has(action_type) ? action_type : 'url';
+    const cleanActionValue = action_value?.trim() || '';
+    if ((resolvedActionType === 'url' || resolvedActionType === 'launch') && cleanActionValue) {
+      if (!isSafeHttpUrl(cleanActionValue)) {
+        res.status(400).json({ error: 'Skill URL must use http:// or https://.' });
+        return;
+      }
+    }
     const skill = createSkill({
       display_name: display_name.trim(),
       description: description?.trim() || 'Custom user automation skill',
       trigger_phrases: trigger_phrases.map((t) => t.trim()).filter(Boolean),
-      action_type: action_type || 'url',
-      action_value: action_value?.trim() || '',
+      action_type: resolvedActionType,
+      action_value: cleanActionValue,
     });
     res.json({ skill, skills: getSkills() });
   });
 
   app.patch('/api/skills/:id', (req, res) => {
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid skill id.' });
+      return;
+    }
     const { is_enabled } = req.body as { is_enabled?: boolean };
-    toggleSkill(Number(req.params.id), Boolean(is_enabled));
+    toggleSkill(id, Boolean(is_enabled));
     res.json({ ok: true, skills: getSkills() });
   });
 
   app.delete('/api/skills/:id', (req, res) => {
-    deleteSkill(Number(req.params.id));
+    const id = parsePositiveId(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Invalid skill id.' });
+      return;
+    }
+    deleteSkill(id);
     res.json({ ok: true, skills: getSkills() });
   });
 

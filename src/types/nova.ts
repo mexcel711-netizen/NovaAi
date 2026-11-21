@@ -169,6 +169,9 @@ export interface AppConfig {
   onboarding_completed: boolean;
   whatsapp_number: string;
   referral_source: string;
+  auto_usb_transfer: boolean;
+  last_usb_sync_at: string;
+  last_usb_drive_label: string;
 }
 
 export interface OnboardingPayload {
@@ -202,6 +205,14 @@ export interface SkillExecutionResult {
       | 'trigger_vision'
       | 'trigger_evolve'
       | 'open_study'
+      | 'transfer_usb'
+      | 'toggle_auto_usb'
+      | 'check_usb'
+      | 'navigate_page'
+      | 'new_session'
+      | 'list_memories'
+      | 'list_notes'
+      | 'list_reminders'
       | 'none';
     url?: string;
     noteTitle?: string;
@@ -212,6 +223,9 @@ export interface SkillExecutionResult {
     mood?: MoodMode;
     characterSlug?: string;
     studyTopic?: string;
+    driveHint?: string;
+    autoUsbEnabled?: boolean;
+    navigatePage?: SidebarPage;
   };
 }
 

@@ -2,17 +2,34 @@ import {
   fetchDesktopSystemInfo,
   getDesktopBridgeToken,
   listDesktopFiles,
+  listUsbDrives,
   openChromeNewTab,
   openDesktopLocation,
   runDesktopApp,
   searchInChrome,
 } from './desktopBridge';
+import { detectUsbTransferIntent } from './usbTransfer';
 
 export async function executeDesktopCommand(
   raw: string
 ): Promise<{ reply: string; emotion: 'happy' } | null> {
   // Only intercept laptop commands when desktop companion is paired
   if (!getDesktopBridgeToken()) return null;
+
+  const usbIntent = detectUsbTransferIntent(raw);
+  if (usbIntent) {
+    if (usbIntent.action === 'check_status') {
+      const drives = await listUsbDrives();
+      return {
+        reply:
+          drives.length > 0
+            ? `Connected USB drives: ${drives.map((d) => `${d.label} (${d.path})`).join(', ')}`
+            : 'Abhi laptop par koi removable USB drive detect nahi hui.',
+        emotion: 'happy',
+      };
+    }
+    return null;
+  }
 
   const urduWords: Record<string, string> = {
     'کروم': 'chrome', 'گوگل': 'google', 'کھولو': 'kholo', 'کھولیں': 'kholo',

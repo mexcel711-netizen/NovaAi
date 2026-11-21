@@ -158,3 +158,49 @@ test('matchSkillCommand handles mood switch, character switch, and camera vision
   assert.equal(visionRes.matched, true);
   assert.equal(visionRes.sideEffect?.type, 'trigger_vision');
 });
+
+test('matchSkillCommand executes USB transfer, auto-USB sync, UI navigation, and Urdu script commands', () => {
+  const usbNow = matchSkillCommand('یو ایس بی میں ٹرانسفر کر دو', baseSkills);
+  assert.equal(usbNow.matched, true);
+  assert.equal(usbNow.skillName, 'usb_memory_sync');
+  assert.equal(usbNow.sideEffect?.type, 'transfer_usb');
+
+  const usbAuto = matchSkillCommand('خود بخود یو ایس بی میں ٹرانسفر کر دو', baseSkills);
+  assert.equal(usbAuto.matched, true);
+  assert.equal(usbAuto.sideEffect?.type, 'toggle_auto_usb');
+  assert.equal(usbAuto.sideEffect?.autoUsbEnabled, true);
+
+  const usbAutoOff = matchSkillCommand('auto USB transfer band karo', baseSkills);
+  assert.equal(usbAutoOff.matched, true);
+  assert.equal(usbAutoOff.sideEffect?.type, 'toggle_auto_usb');
+  assert.equal(usbAutoOff.sideEffect?.autoUsbEnabled, false);
+
+  const navMem = matchSkillCommand('میموری کھولو', baseSkills);
+  assert.equal(navMem.matched, true);
+  assert.equal(navMem.sideEffect?.type, 'navigate_page');
+  assert.equal(navMem.sideEffect?.navigatePage, 'memory');
+
+  const newChat = matchSkillCommand('نئی چیٹ', baseSkills);
+  assert.equal(newChat.matched, true);
+  assert.equal(newChat.sideEffect?.type, 'new_session');
+
+  const urNote = matchSkillCommand('نوٹ لکھو: کل پروجیکٹ ریویو کرنا ہے', baseSkills);
+  assert.equal(urNote.matched, true);
+  assert.equal(urNote.sideEffect?.type, 'create_note');
+
+  const urNoteBuild = matchSkillCommand('نوٹ بناؤ کل 10 بجے میٹنگ ہے', baseSkills);
+  assert.equal(urNoteBuild.matched, true);
+  assert.equal(urNoteBuild.sideEffect?.type, 'create_note');
+  assert.equal(urNoteBuild.sideEffect?.noteContent, 'کل 10 بجے میٹنگ ہے');
+
+  const urReminder = matchSkillCommand('یاد دہانی لگاؤ دوائی کھانی ہے', baseSkills);
+  assert.equal(urReminder.matched, true);
+  assert.equal(urReminder.sideEffect?.type, 'create_reminder');
+  assert.equal(urReminder.sideEffect?.reminderTitle, 'دوائی کھانی ہے');
+
+  const urApp = matchSkillCommand('یوٹیوب کھولو', baseSkills);
+  assert.equal(urApp.matched, true);
+  assert.equal(urApp.sideEffect?.type, 'open_url');
+  assert.equal(urApp.sideEffect?.url, 'https://www.youtube.com');
+});
+

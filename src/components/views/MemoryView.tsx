@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { CheckCircle2, Circle, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Circle, FolderSync, HardDriveDownload, Plus, Search, Trash2, Usb } from 'lucide-react';
 import { filterMemories, isTodayIso } from '../../lib/memoryExtractor';
+import { getLinkedUsbDirectoryName, type UsbTransferOutcome } from '../../lib/usbTransfer';
 import type { KnowledgeSource, MemoryRecord, NoteRecord, ReminderRecord } from '../../types/nova';
 import { ConfirmDialog } from '../ConfirmDialog';
 
@@ -9,6 +10,12 @@ interface MemoryViewProps {
   notes: NoteRecord[];
   reminders: ReminderRecord[];
   knowledge: KnowledgeSource[];
+  autoUsbTransfer: boolean;
+  lastUsbSyncAt: string;
+  lastUsbDriveLabel: string;
+  onToggleAutoUsb: (enabled: boolean) => Promise<void>;
+  onTransferToUsb: () => Promise<UsbTransferOutcome>;
+  onLinkUsbFolder: () => Promise<{ name: string }>;
   onAddMemory: (input: {
     category: MemoryRecord['category'];
     key: string;
@@ -31,6 +38,12 @@ export function MemoryView({
   notes,
   reminders,
   knowledge,
+  autoUsbTransfer,
+  lastUsbSyncAt,
+  lastUsbDriveLabel,
+  onToggleAutoUsb,
+  onTransferToUsb,
+  onLinkUsbFolder,
   onAddMemory,
   onDeleteMemory,
   onClearAllMemories,
@@ -42,6 +55,13 @@ export function MemoryView({
   onDeleteKnowledge,
 }: MemoryViewProps) {
   const [activeTab, setActiveTab] = useState<MemoryTab>('all');
+  const [usbBusy, setUsbBusy] = useState(false);
+  const [usbStatusMsg, setUsbStatusMsg] = useState<string | null>(null);
+  const [linkedFolderName, setLinkedFolderName] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getLinkedUsbDirectoryName().then(setLinkedFolderName);
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | MemoryRecord['category']>('all');
 
@@ -158,19 +178,88 @@ export function MemoryView({
         <div>
           <h1 className="font-display text-2xl font-semibold text-white">Memory Vault</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Review and manage long-term facts, daily notes, active reminders, and studied material in SQLite.
+            Continuously records facts, notes, reminders &amp; study history — ready to transfer or auto-sync to USB.
           </p>
         </div>
-        {memories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setPendingDelete({ type: 'clear_all' })}
-            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20 whitespace-nowrap shrink-0"
+            disabled={usbBusy}
+            onClick={async () => {
+              setUsbBusy(true);
+              try {
+                const res = await onTransferToUsb();
+                setUsbStatusMsg(res.message);
+              } catch (err) {
+                setUsbStatusMsg(err instanceof Error ? err.message : 'USB transfer failed.');
+              } finally {
+                setUsbBusy(false);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 disabled:opacity-50 whitespace-nowrap shrink-0"
           >
-            Clear All Memories
+            <HardDriveDownload className="h-3.5 w-3.5" />
+            <span>{usbBusy ? 'Transferring...' : 'Transfer to USB'}</span>
           </button>
-        )}
+
+          <button
+            type="button"
+            disabled={usbBusy}
+            onClick={async () => {
+              try {
+                const linked = await onLinkUsbFolder();
+                setLinkedFolderName(linked.name);
+                setUsbStatusMsg(`USB folder "${linked.name}" linked for 1-click & automatic sync.`);
+              } catch (err) {
+                setUsbStatusMsg(err instanceof Error ? err.message : 'Unable to link USB folder.');
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0D1117] px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-white whitespace-nowrap shrink-0"
+          >
+            <FolderSync className="h-3.5 w-3.5 text-cyan-400" />
+            <span>{linkedFolderName ? `USB: ${linkedFolderName}` : 'Link USB Folder'}</span>
+          </button>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoUsbTransfer}
+            onClick={() => void onToggleAutoUsb(!autoUsbTransfer)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              autoUsbTransfer
+                ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200'
+                : 'border-slate-700 bg-[#0D1117] text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            <Usb className="h-3.5 w-3.5" />
+            <span>Auto-Transfer USB: {autoUsbTransfer ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {memories.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPendingDelete({ type: 'clear_all' })}
+              className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20 whitespace-nowrap shrink-0"
+            >
+              Clear All Memories
+            </button>
+          )}
+        </div>
       </div>
+
+      {(usbStatusMsg || lastUsbSyncAt) && (
+        <div
+          role="status"
+          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-3.5 py-2 text-xs text-cyan-100"
+        >
+          <span>{usbStatusMsg || `Last USB backup: ${lastUsbDriveLabel || 'USB Vault'}`}</span>
+          {lastUsbSyncAt && (
+            <span className="font-mono text-[11px] text-cyan-300/80 tabular-nums">
+              Synced {new Date(lastUsbSyncAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tabs + Search */}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

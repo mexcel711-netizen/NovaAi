@@ -106,3 +106,54 @@ export async function fetchDesktopSystemInfo(): Promise<{
   if (!response.ok) throw new Error(data.error || 'Unable to read laptop system info.');
   return data;
 }
+
+export interface UsbDriveInfo {
+  path: string;
+  label: string;
+  freeBytes?: number;
+  sizeBytes?: number;
+}
+
+export async function listUsbDrives(): Promise<UsbDriveInfo[]> {
+  const token = requireToken();
+  const response = await fetch('http://127.0.0.1:3210/v1/usb/list', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = (await response.json()) as {
+    error?: string;
+    drives?: UsbDriveInfo[];
+  };
+  if (!response.ok) throw new Error(data.error || 'Unable to scan removable USB drives.');
+  return data.drives || [];
+}
+
+export async function transferMemoryToUsb(payload: {
+  drivePath: string;
+  jsonContent: string;
+  markdownContent: string;
+}): Promise<{ ok: boolean; drivePath: string; filePath: string; markdownPath: string }> {
+  const token = requireToken();
+  const response = await fetch('http://127.0.0.1:3210/v1/usb/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const data = (await response.json()) as {
+    error?: string;
+    ok?: boolean;
+    drivePath?: string;
+    filePath?: string;
+    markdownPath?: string;
+  };
+  if (!response.ok || !data.filePath) {
+    throw new Error(data.error || 'USB memory transfer failed.');
+  }
+  return {
+    ok: true,
+    drivePath: data.drivePath || payload.drivePath,
+    filePath: data.filePath,
+    markdownPath: data.markdownPath || '',
+  };
+}
+

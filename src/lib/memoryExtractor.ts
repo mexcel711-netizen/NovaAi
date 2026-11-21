@@ -37,12 +37,13 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
     });
   }
 
-  // Location patterns
-  const locEn = trimmed.match(/\bi (?:live|am based|work) in\s+([a-zA-Z\s,.-]{2,40})/i);
-  const locUr = trimmed.match(/\bmein\s+([a-zA-Z\s,.-]{2,35})\s+mein\s+rehta\b/i);
-  const rawLoc = locEn?.[1] || locUr?.[1];
+  // Location patterns (English + Roman Urdu + Urdu script)
+  const locEn = trimmed.match(/\bi (?:live|am based|work|stay) in\s+([a-zA-Z\s,.-]{2,40})/i);
+  const locUr = trimmed.match(/\b(?:mein|main)\s+([a-zA-Z\s,.-]{2,35})\s+(?:mein|main|se)\s+(?:rehta|rehti|rahta|rahti|hoon|hun)\b/i);
+  const locUrScript = trimmed.match(/میں\s+([^\s۔!؟,،]{2,30})\s+(?:میں|سے)\s+(?:رہتا|رہتی|ہوں)/);
+  const rawLoc = locEn?.[1] || locUr?.[1] || locUrScript?.[1];
   if (rawLoc) {
-    const cleanLoc = rawLoc.replace(/[.!?]+$/, '').trim();
+    const cleanLoc = rawLoc.replace(/[.!?۔]+$/, '').trim();
     if (cleanLoc.length >= 2) {
       candidates.push({
         category: 'fact',
@@ -56,8 +57,9 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
 
   // Profession / Role / Study patterns
   const roleEn = trimmed.match(/\bi am an?\s+([a-zA-Z0-9\s-]{2,40}?)(?:\s+(?:and|aur|who|working|living)\b|[.!?,]|$)/i);
-  const roleUr = trimmed.match(/\bmein\s+aik?\s+([a-zA-Z0-9\s-]{2,40}?)\s+hoon\b/i);
-  const rawRole = roleEn?.[1] || roleUr?.[1];
+  const roleUr = trimmed.match(/\b(?:mein|main)\s+aik?\s+([a-zA-Z0-9\s-]{2,40}?)\s+(?:hoon|hun)\b/i);
+  const roleUrScript = trimmed.match(/(?:میرا پیشہ|میرا کام)\s+([^\n۔!؟]{2,45})\s+(?:ہے|ہوں)/);
+  const rawRole = roleEn?.[1] || roleUr?.[1] || roleUrScript?.[1];
   if (rawRole && !/\b(feeling|sure|happy|sad|tired|good)\b/i.test(rawRole)) {
     candidates.push({
       category: 'fact',
@@ -83,10 +85,11 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
     });
   }
 
-  // Preference / Dislike patterns
+  // Preference / Dislike patterns (English + Roman Urdu + Urdu script)
   const dislikeEn = trimmed.match(/\bi (?:hate|dislike|don't like)\s+([^.!?]{3,65})/i);
   const dislikeUr = trimmed.match(/\bmujhe\s+([^.!?]{3,60}?)\s+pasand nahi\b/i);
-  const rawDislike = dislikeEn?.[1] || dislikeUr?.[1];
+  const dislikeUrScript = trimmed.match(/مجھے\s+([^\n۔!؟]{2,60}?)\s+پسند نہیں/);
+  const rawDislike = dislikeEn?.[1] || dislikeUr?.[1] || dislikeUrScript?.[1];
   if (rawDislike) {
     candidates.push({
       category: 'preference',
@@ -97,8 +100,9 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
     });
   } else {
     const prefEn = trimmed.match(/\bi (?:prefer|love|like|always use)\s+([^.!?]{3,70})/i);
-    const prefUr = trimmed.match(/\bmujhe\s+([^.!?]{3,60}?)\s+(?:pasand hai|achha lagta hai)\b/i);
-    const rawPref = prefEn?.[1] || prefUr?.[1];
+    const prefUr = trimmed.match(/\bmujhe\s+([^.!?]{3,60}?)\s+(?:pasand hai|achha lagta hai|bohat pasand)\b/i);
+    const prefUrScript = trimmed.match(/مجھے\s+([^\n۔!؟]{2,60}?)\s+(?:پسند ہے|اچھا لگتا ہے)/);
+    const rawPref = prefEn?.[1] || prefUr?.[1] || prefUrScript?.[1];
     if (rawPref) {
       candidates.push({
         category: 'preference',
@@ -113,7 +117,8 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
   // Study / Reading / Course interest
   const studyInterest =
     trimmed.match(/\b(?:i am studying|i'm learning|studying|reading)\s+([^.!?]{3,70})/i) ||
-    trimmed.match(/\b(?:mein|main)\s+([^.!?]{3,65}?)\s+(?:parh raha|seekh raha|parh rahi|seekh rahi)\b/i);
+    trimmed.match(/\b(?:mein|main)\s+([^.!?]{3,65}?)\s+(?:parh raha|seekh raha|parh rahi|seekh rahi)\b/i) ||
+    trimmed.match(/میں\s+([^\n۔!؟]{3,65}?)\s+(?:پڑھ رہا|سیکھ رہا|پڑھ رہی|سیکھ رہی)/);
   if (studyInterest && studyInterest[1].trim().length > 2) {
     candidates.push({
       category: 'fact',
@@ -125,7 +130,7 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
   }
 
   // Daily routine / late-night / mood patterns
-  if (/\b(late at night|raat ko|neend nahi|subah jaldi|chaai|chai|coffee)\b/i.test(trimmed)) {
+  if (/\b(late at night|raat ko|neend nahi|subah jaldi|chaai|chai|coffee)\b/i.test(trimmed) || /(رات کو|نیند نہیں|چائے|کافی)/.test(trimmed)) {
     const routineSnippet = trimmed.slice(0, 110);
     candidates.push({
       category: 'preference',
@@ -136,11 +141,11 @@ export function extractMemoriesFromUtterance(text: string): ExtractedMemoryCandi
     });
   }
 
-  // Explicit "remember that ..." command
+  // Explicit "remember that ..." / "memory mein record karo ..." command
   const explicitMem =
-    trimmed.match(/^(?:remember(?:\s+that)?|keep in mind(?:\s+that)?)\s+(.+)$/i) ||
-    trimmed.match(/^(?:yaad\s+rakh(?:o|na)(?:\s+ke)?)\s+(.+)$/i) ||
-    trimmed.match(/^(?:یاد رکھو|یاد رکھنا)\s*(?:کہ)?\s*(.+)$/);
+    trimmed.match(/^(?:remember(?:\s+that)?|keep in mind(?:\s+that)?|save\s+(?:this\s+)?(?:in|to)\s+memory\s*[:\-]?|record\s+(?:this\s+)?(?:in|to)\s+memory\s*[:\-]?)\s*(.+)$/i) ||
+    trimmed.match(/^(?:yaad\s+rakh(?:o|na)(?:\s+ke)?|memory\s+mein\s+(?:save|record|likh)\s*(?:karo|kar\s*do)?\s*[:\-]?)\s*(.+)$/i) ||
+    trimmed.match(/^(?:یاد رکھو|یاد رکھنا|میموری میں (?:محفوظ|ریکارڈ|سیو) (?:کرو|کر دو))\s*(?:کہ)?\s*[:\-]?\s*(.+)$/);
   if (explicitMem && explicitMem[1].trim().length > 2) {
     candidates.push({
       category: 'fact',

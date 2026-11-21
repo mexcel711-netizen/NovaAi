@@ -18,6 +18,7 @@ interface HolographicAvatarProps {
   micLevel?: number;
   lipOpenness?: number;
   lipWidth?: number;
+  deepThinking?: boolean;
 }
 
 const HAIRSTYLE_IMAGES: Record<HairstyleOption, string> = {
@@ -28,16 +29,6 @@ const HAIRSTYLE_IMAGES: Record<HairstyleOption, string> = {
 
 const OFFSCREEN_SIZE = 512;
 const VOICE_WAVE_BAR_COUNT = 15;
-
-interface HoloParticle {
-  x: number;
-  y: number;
-  r: number;
-  speedY: number;
-  drift: number;
-  alpha: number;
-  phaseOffset: number;
-}
 
 
 export function HolographicAvatar({
@@ -51,6 +42,7 @@ export function HolographicAvatar({
   micLevel = 0,
   lipOpenness = 0,
   lipWidth = 0,
+  deepThinking = false,
 }: HolographicAvatarProps) {
   const shouldShowWaves = showVoiceWaves ?? variant !== 'compact';
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -131,19 +123,6 @@ export function HolographicAvatar({
       img.src = HAIRSTYLE_IMAGES[styleKey];
     });
 
-    const particles: HoloParticle[] = Array.from(
-      { length: variant === 'compact' ? 14 : 30 },
-      (_, idx) => ({
-        x: 0.14 + ((idx * 37) % 72) / 100,
-        y: 0.12 + ((idx * 53) % 76) / 100,
-        r: 0.8 + (idx % 3) * 0.55,
-        speedY: 0.00038 + (idx % 5) * 0.00014,
-        drift: 0.0045 + (idx % 4) * 0.002,
-        alpha: 0.25 + (idx % 4) * 0.16,
-        phaseOffset: idx * 0.7,
-      })
-    );
-
     const emotionWeights: Record<FacialEmotion, number> = {
       calm: 1,
       happy: 0,
@@ -178,8 +157,7 @@ export function HolographicAvatar({
       glowPrimary: string,
       glowSoft: string
     ) => {
-      // 1. Soft breathing holographic glow localized over the hair crown & flowing locks
-      const haloBreath = 0.8 + 0.2 * Math.sin(hairPhase * 1.15);
+      // 1. Steady soft holographic sheen localized over the hair crown (zero brightness pulsing)
       const hairGlowX =
         styleKey === 'bob'
           ? drawX + drawSize * 0.48
@@ -187,7 +165,7 @@ export function HolographicAvatar({
             ? drawX + drawSize * 0.42
             : drawX + drawSize * 0.44;
       const hairGlowY = drawY + drawSize * 0.29;
-      const hairGlowR = drawSize * 0.36;
+      const hairGlowR = drawSize * 0.35;
 
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
@@ -202,33 +180,48 @@ export function HolographicAvatar({
       hairHalo.addColorStop(0, glowPrimary);
       hairHalo.addColorStop(0.55, glowSoft);
       hairHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.globalAlpha = 0.34 * haloBreath;
+      ctx.globalAlpha = 0.28;
       ctx.fillStyle = hairHalo;
       ctx.beginPath();
       ctx.arc(hairGlowX, hairGlowY, hairGlowR, 0, Math.PI * 2);
       ctx.fill();
 
-      // 2. Weightless luminous hair strands floating gently in the air (zero portrait distortion)
+      // 2. Layered silky luminous hair strands flowing smoothly in the air (zero portrait distortion)
       const wisps = computeHairAirWisps({
         hairstyle: styleKey,
         phase: hairPhase,
         drawX,
         drawY,
         drawSize,
-        intensity: prefersReducedMotion ? 0.4 : 0.92,
+        intensity: prefersReducedMotion ? 0.35 : 1,
       });
 
       ctx.lineCap = 'round';
+      ctx.globalAlpha = 1;
       for (const w of wisps) {
-        const grad = ctx.createLinearGradient(w.x0, w.y0, w.x1, w.y1);
-        grad.addColorStop(0, 'rgba(165, 243, 252, 0)');
-        grad.addColorStop(0.38, `rgba(165, 243, 252, ${w.alpha})`);
-        grad.addColorStop(0.75, `rgba(103, 232, 249, ${(w.alpha * 0.85).toFixed(3)})`);
-        grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        // Outer soft silk hair bloom
+        const bloomGrad = ctx.createLinearGradient(w.x0, w.y0, w.x1, w.y1);
+        bloomGrad.addColorStop(0, 'rgba(125, 211, 252, 0)');
+        bloomGrad.addColorStop(0.32, `rgba(125, 211, 252, ${(w.alpha * 0.38).toFixed(3)})`);
+        bloomGrad.addColorStop(0.74, `rgba(56, 189, 248, ${(w.alpha * 0.30).toFixed(3)})`);
+        bloomGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
 
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = w.lineWidth;
+        ctx.strokeStyle = bloomGrad;
+        ctx.lineWidth = w.lineWidth * 2.4;
+        ctx.beginPath();
+        ctx.moveTo(w.x0, w.y0);
+        ctx.bezierCurveTo(w.cx1, w.cy1, w.cx2, w.cy2, w.x1, w.y1);
+        ctx.stroke();
+
+        // Crisp inner silky hair filament
+        const coreGrad = ctx.createLinearGradient(w.x0, w.y0, w.x1, w.y1);
+        coreGrad.addColorStop(0, 'rgba(224, 242, 254, 0)');
+        coreGrad.addColorStop(0.28, `rgba(224, 242, 254, ${Math.min(0.85, w.alpha * 1.45).toFixed(3)})`);
+        coreGrad.addColorStop(0.72, `rgba(103, 232, 249, ${Math.min(0.75, w.alpha * 1.1).toFixed(3)})`);
+        coreGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+        ctx.strokeStyle = coreGrad;
+        ctx.lineWidth = Math.max(0.85, w.lineWidth * 0.9);
         ctx.beginPath();
         ctx.moveTo(w.x0, w.y0);
         ctx.bezierCurveTo(w.cx1, w.cy1, w.cx2, w.cy2, w.x1, w.y1);
@@ -358,10 +351,9 @@ export function HolographicAvatar({
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // 72 Precision degree ticks around perimeter
-        const tickRot = prefersReducedMotion ? 0 : phase * 0.08;
+        // 72 Static high-precision degree ticks around perimeter (never rotates or jitters)
         for (let i = 0; i < 72; i++) {
-          const a = (i / 72) * Math.PI * 2 + tickRot;
+          const a = (i / 72) * Math.PI * 2;
           const isMajor = i % 6 === 0;
           const rIn = ringRadius + 2;
           const rOut = ringRadius + (isMajor ? 8 : 4);
@@ -424,29 +416,6 @@ export function HolographicAvatar({
         }
       }
 
-      // 4. Drifting starlight particles floating calmly inside the circular halo
-      if (!prefersReducedMotion) {
-        ctx.save();
-        for (const p of particles) {
-          const py = ((p.y - windPhase * p.speedY * 20) % 1 + 1) % 1;
-          const px = p.x + Math.sin(windPhase * 1.1 + p.phaseOffset) * p.drift;
-          const xPos = px * width;
-          const yPos = py * height;
-          const distFromCenter = Math.hypot(xPos - cx, yPos - cy);
-          if (distFromCenter < ringRadius - 6) {
-            const twinkle = 0.45 + 0.55 * Math.sin(windPhase * 2.1 + p.phaseOffset);
-            ctx.fillStyle =
-              emotionWeights.love > 0.35
-                ? `rgba(251, 182, 206, ${p.alpha * twinkle})`
-                : `rgba(165, 243, 252, ${p.alpha * twinkle})`;
-            ctx.beginPath();
-            ctx.arc(xPos, yPos, p.r, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        ctx.restore();
-      }
-
       ctx.restore();
 
       if (!prefersReducedMotion) {
@@ -482,12 +451,15 @@ export function HolographicAvatar({
           ? 'bg-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.55)]'
           : 'bg-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.55)]';
 
+  const activeFocus = state === 'thinking' || deepThinking;
+
   return (
     <div
       ref={containerRef}
       className="relative flex w-full flex-col items-center justify-center"
       data-testid="holographic-avatar"
       data-state={state}
+      data-focus={activeFocus ? 'active' : 'off'}
       data-emotion={emotion}
       data-hairstyle={hairstyle}
       data-hair-wind="0.32"

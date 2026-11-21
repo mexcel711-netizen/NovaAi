@@ -84,4 +84,9 @@ test('buildQuickUrduPhoneticScript maps common Roman Urdu phrases into Urdu scri
   const res = buildQuickUrduPhoneticScript('Arre Boss! Kya chal raha hai? Batao!');
   assert.equal(res.matched, true);
   assert.ok(/[\u0600-\u06FF]/.test(res.converted));
+
+  const greeting = buildQuickUrduPhoneticScript('Assalam-o-Alaikum Boss! Main ZARA hoon, bilkul tayar hoon.');
+  assert.equal(greeting.matched, true);
+  assert.ok(greeting.converted.includes('السلام علیکم'));
+  assert.ok(greeting.converted.includes('زارا'));
 });

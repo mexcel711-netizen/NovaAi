@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Heart, Plus, Sparkles, Trash2, UserCheck, X } from 'lucide-react';
+import { FEMALE_VOICE_OPTIONS, MALE_VOICE_OPTIONS } from '../../lib/voiceCatalog';
 import type {
   AppConfig,
   CharacterProfile,
@@ -253,7 +254,7 @@ export function CharacterView({
             </div>
             <div>
               <label htmlFor="new-char-voice" className="block text-xs font-medium text-slate-300">
-                Voice Persona
+                Voice Persona (Female &amp; Male)
               </label>
               <select
                 id="new-char-voice"
@@ -261,9 +262,20 @@ export function CharacterView({
                 onChange={(e) => setNewVoice(e.target.value)}
                 className="mt-1.5 w-full rounded-lg border border-slate-800 bg-[#111827] px-3 py-2 text-sm text-white focus:border-cyan-500/60 focus:outline-none"
               >
-                <option value="Kore">Kore — Pakistani Urdu Female</option>
-                <option value="Zephyr">Zephyr — Warm &amp; Bright Female</option>
-                <option value="Puck">Puck — Crisp Conversational</option>
+                <optgroup label="Female Voices (Realistic)">
+                  {FEMALE_VOICE_OPTIONS.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Male Voices (Realistic)">
+                  {MALE_VOICE_OPTIONS.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
             <div className="sm:col-span-2">
