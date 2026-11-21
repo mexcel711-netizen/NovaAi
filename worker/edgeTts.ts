@@ -5,7 +5,7 @@ import {
 } from '../src/lib/edgeTtsSecurity';
 
 export const NOVA_VOICE = 'ur-PK-UzmaNeural';
-const OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
+const OUTPUT_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
 const EDGE_URL = 'wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1';
 
 type EdgeWorkerWebSocket = WebSocket & { accept(): void };
@@ -57,12 +57,17 @@ function speechConfigMessage(): string {
 
 function ssmlMessage(text: string, requestId: string): string {
   const safeText = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, ' ');
+  // Add restrained, language-aware pauses instead of sending a flat stream of text.
+  // Urdu sentence marks (۔ ؟) and standard punctuation are all handled.
+  const pacedText = escapeXml(safeText)
+    .replace(/([،,;؛])\s+/g, '$1<break time="110ms"/>')
+    .replace(/([.!?؟۔])\s+/g, '$1<break time="230ms"/>');
   return [
     `X-RequestId:${requestId}`,
     'Content-Type:application/ssml+xml',
     'Path:ssml',
     '',
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK"><voice name="${NOVA_VOICE}"><prosody rate="+0%" pitch="+0Hz" volume="+0%">${escapeXml(safeText)}</prosody></voice></speak>`,
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ur-PK"><voice name="${NOVA_VOICE}"><prosody rate="-6%" pitch="+1Hz" volume="+0%">${pacedText}</prosody></voice></speak>`,
   ].join('\r\n');
 }
 
