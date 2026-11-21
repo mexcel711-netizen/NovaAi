@@ -169,6 +169,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   onboarding_completed: false,
   whatsapp_number: '',
   referral_source: '',
+  auto_usb_transfer: false,
+  last_usb_sync_at: '',
+  last_usb_drive_label: '',
 };
 
 function seedDefaults() {
@@ -498,6 +501,9 @@ export function getConfig(): AppConfig {
     onboarding_completed: map.get('onboarding_completed') === 'true',
     whatsapp_number: map.get('whatsapp_number') ?? DEFAULT_CONFIG.whatsapp_number,
     referral_source: map.get('referral_source') ?? DEFAULT_CONFIG.referral_source,
+    auto_usb_transfer: map.get('auto_usb_transfer') === 'true',
+    last_usb_sync_at: map.get('last_usb_sync_at') ?? DEFAULT_CONFIG.last_usb_sync_at,
+    last_usb_drive_label: map.get('last_usb_drive_label') ?? DEFAULT_CONFIG.last_usb_drive_label,
   };
 }
 
@@ -1019,6 +1025,29 @@ export function getRecentUserMessages(limit: number = 15): string[] {
     .prepare("SELECT content FROM conversations WHERE role = 'user' ORDER BY id DESC LIMIT ?")
     .all(limit) as Array<{ content: string }>;
   return rows.map((r) => r.content);
+}
+
+export function getRecentConversationsForExport(limit: number = 250): Array<{
+  session_id: string;
+  role: string;
+  content: string;
+  language: string;
+  timestamp: string;
+}> {
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(1000, Math.trunc(limit))) : 250;
+  const rows = db
+    .prepare(
+      'SELECT session_id, role, content, language, timestamp FROM conversations ORDER BY id DESC LIMIT ?'
+    )
+    .all(safeLimit) as Array<Record<string, unknown>>;
+
+  return rows.reverse().map((row) => ({
+    session_id: String(row.session_id ?? ''),
+    role: String(row.role ?? ''),
+    content: String(row.content ?? ''),
+    language: String(row.language ?? 'en'),
+    timestamp: String(row.timestamp ?? ''),
+  }));
 }
 
 export function getSessionSummaries(): SessionSummary[] {
