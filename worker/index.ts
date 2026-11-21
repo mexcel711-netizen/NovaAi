@@ -1,4 +1,5 @@
 import { detectEmotionFromText, extractEmotionAndCleanText, resolveActiveAiProvider } from '../src/lib/emotionAndSpeech';
+import { ZARA_SOUL_PROMPT } from '../src/lib/zaraSoul';
 import { synthesizeUzmaInWorker } from './edgeTts';
 import { extractMemoriesFromUtterance } from '../src/lib/memoryExtractor';
 import { detectUrduIntent, isComplexThinkingQuery, matchSkillCommand } from '../src/lib/skillMatcher';
@@ -57,6 +58,7 @@ const languageStyle = lang === 'ur'
   ? 'The user is speaking Urdu/Roman Urdu. Reply in natural Pakistani conversational Urdu/Roman Urdu, matching the script they used. Do not switch to stiff English.'
   : 'The user is speaking English. Reply in natural, warm English. Use Pakistani expressions only when they fit naturally.';
 const prompt = [
+  ZARA_SOUL_PROMPT,
   persona,
   'You are ZARA, a personal assistant and companion. Be accurate, emotionally aware, practical and conversational—not robotic.',
   `Address the user naturally as "${nickname}" when it fits; never repeat their name in every sentence.`,
