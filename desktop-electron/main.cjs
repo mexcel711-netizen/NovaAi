@@ -92,8 +92,9 @@ function registerDesktopHandlers() {
   ipcMain.handle('zara:open-location', (event, location) => agentRequest(event, '/v1/open-location', { location }));
   ipcMain.handle('zara:list-files', (event, location) => agentRequest(event, '/v1/files/list', { location }));
   ipcMain.handle('zara:system-info', (event) => agentRequest(event, '/v1/system/info', undefined, 'GET'));
-  ipcMain.handle('zara:runtime-info', (event) => {
+  ipcMain.handle('zara:runtime-info', async (event) => {
     assertTrustedSender(event);
+    await waitForBridge();
     return { version: app.getVersion(), platform: process.platform, dataDir: DATA_DIR, bridgeReady };
   });
   ipcMain.handle('zara:open-external', async (event, rawUrl) => {
@@ -132,7 +133,7 @@ function startDesktopAgent() {
 function isTrustedNavigation(rawUrl) {
   try {
     const url = new URL(rawUrl);
-    return url.origin === APP_ORIGIN || (url.protocol === 'https:' && url.hostname.endsWith('.cloudflareaccess.com'));
+    return url.protocol === 'https:' || url.origin === APP_ORIGIN;
   } catch { return false; }
 }
 
@@ -229,5 +230,6 @@ if (!hasSingleInstance) {
     app.quit();
   });
   app.on('before-quit', () => shutdown('before-quit'));
+  app.on('before-quit-for-update', () => shutdown('before-quit-for-update'));
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 }
