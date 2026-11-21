@@ -84,7 +84,7 @@ export async function synthesizeUzma(text: string, timeoutMs = 30000): Promise<B
       perMessageDeflate: false,
       handshakeTimeout: Math.min(timeoutMs, 15000),
       headers: {
-        Host: 'speech.platform.bing.com',
+        // Let ws derive Host from api.msedgeservices.com; do not send the legacy speech.platform.bing.com host.
         Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
         'User-Agent': USER_AGENT,
         'Accept-Language': 'en-US,en;q=0.9',
