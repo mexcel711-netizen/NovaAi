@@ -61,6 +61,9 @@ const DEFAULT_CONFIG: AppConfig = {
   onboarding_completed: false,
   whatsapp_number: '',
   referral_source: '',
+  auto_usb_transfer: false,
+  last_usb_sync_at: '',
+  last_usb_drive_label: '',
 };
 
 const json = (value: unknown, status = 200) =>
@@ -203,6 +206,9 @@ async function readConfig(db: D1Database): Promise<AppConfig> {
     onboarding_completed: get('onboarding_completed', 'false') === 'true',
     whatsapp_number: get('whatsapp_number', ''),
     referral_source: get('referral_source', ''),
+    auto_usb_transfer: get('auto_usb_transfer', 'false') === 'true',
+    last_usb_sync_at: get('last_usb_sync_at', ''),
+    last_usb_drive_label: get('last_usb_drive_label', ''),
   };
 }
 
