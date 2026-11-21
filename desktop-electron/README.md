@@ -40,6 +40,7 @@ Do not commit the token. Automatic updates run only in packaged builds and check
 - Main process writes `Documents/ZARA AI/logs/zara_main.log`.
 - Bootstrap creates `Documents/ZARA AI/SOUL.md`, an empty `MEMORY.md` placeholder, and `media`, `exports`, and `logs` directories. Existing user files are never overwritten.
 - The local desktop agent runs as an Electron utility process and binds only to `127.0.0.1:3210`.
+- The `zara-media://` protocol serves files placed directly in `Documents/ZARA AI/media`, with path traversal blocked.
 - The renderer uses a context-isolated preload bridge. It receives only named desktop actions; no raw shell, arbitrary IPC, Node.js integration, or filesystem API is exposed to the webpage.
 - Desktop actions are allowlisted by the existing companion and additionally gated to the trusted ZARA application origin.
 - The existing web/PWA and Cloudflare Worker deployment remain available independently.
