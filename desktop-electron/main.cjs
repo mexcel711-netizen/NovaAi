@@ -176,6 +176,7 @@ function createMainWindow() {
 function configureUpdater() {
   if (!app.isPackaged) { log('INFO', 'Updater skipped in development mode'); return; }
   autoUpdater.autoDownload = true;
+  autoUpdater.on('before-quit-for-update', () => shutdown('before-quit-for-update'));
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('checking-for-update', () => log('INFO', '[Staged Updater] Checking for updates'));
   autoUpdater.on('update-available', (info) => log('INFO', '[Staged Updater] Update available', { version: info.version }));
@@ -230,6 +231,5 @@ if (!hasSingleInstance) {
     app.quit();
   });
   app.on('before-quit', () => shutdown('before-quit'));
-  app.on('before-quit-for-update', () => shutdown('before-quit-for-update'));
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 }
