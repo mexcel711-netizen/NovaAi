@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, shell, utilityProcess, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, utilityProcess, dialog, protocol } = require('electron');
+const { Readable } = require('node:stream');
 const { autoUpdater } = require('electron-updater');
 const { randomBytes } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+
+protocol.registerSchemesAsPrivileged([{ scheme: 'zara-media', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 
 const APP_URL = process.env.ZARA_APP_URL || 'https://novaai.mexcel711.workers.dev';
 const APP_ORIGIN = new URL(APP_URL).origin;
@@ -22,7 +25,13 @@ function log(level, message, detail) {
   const line = '[' + new Date().toISOString() + '] [' + level + '] ' + message + (detail ? ' ' + JSON.stringify(detail) : '');
   try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
-    fs.appendFileSync(path.join(LOG_DIR, 'zara_main.log'), line + '\n', 'utf8');
+    const logFile = path.join(LOG_DIR, 'zara_main.log');
+    if (fs.existsSync(logFile) && fs.statSync(logFile).size > 5 * 1024 * 1024) {
+      const previous = logFile + '.1';
+      if (fs.existsSync(previous)) fs.unlinkSync(previous);
+      fs.renameSync(logFile, previous);
+    }
+    fs.appendFileSync(logFile, line + '\n', 'utf8');
   } catch (error) {
     process.stderr.write(line + ' (log write failed: ' + String(error) + ')\n');
   }
@@ -42,6 +51,27 @@ function bootstrapData() {
     log('INFO', 'Bootstrap created empty MEMORY.md placeholder');
   }
   log('INFO', 'ZARA data directories ready', { dataDir: DATA_DIR });
+}
+
+function registerMediaProtocol() {
+  const mime = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp4': 'video/mp4', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
+  protocol.handle('zara-media', async (request) => {
+    try {
+      const url = new URL(request.url);
+      const name = decodeURIComponent(url.pathname.replace(/^\\/+/, ''));
+      if (!name || name !== path.basename(name)) return new Response('Not found', { status: 404 });
+      const target = path.resolve(MEDIA_DIR, name);
+      if (!target.startsWith(MEDIA_DIR + path.sep)) return new Response('Forbidden', { status: 403 });
+      const stat = await fs.promises.stat(target);
+      if (!stat.isFile()) return new Response('Not found', { status: 404 });
+      return new Response(Readable.toWeb(fs.createReadStream(target)), {
+        headers: { 'Content-Type': mime[path.extname(target).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' }
+      });
+    } catch {
+      return new Response('Not found', { status: 404 });
+    }
+  });
+  log('INFO', 'zara-media:// protocol registered');
 }
 
 function assertTrustedSender(event) {
@@ -159,6 +189,29 @@ function createMainWindow() {
       log('WARN', 'Blocked navigation outside ZARA and Cloudflare Access origins', { url });
     }
   });
+  let firstPaint = false;
+  let reloadAttempted = false;
+  const firstPaintTimer = setTimeout(() => {
+    if (!firstPaint && !reloadAttempted && mainWindow) {
+      reloadAttempted = true;
+      log('WARN', 'No first paint after 25 seconds; reloading once');
+      mainWindow.webContents.reload();
+      setTimeout(() => {
+        if (!firstPaint && mainWindow && !mainWindow.isVisible()) {
+          mainWindow.show();
+          log('WARN', 'First paint still missing after retry; showing window anyway');
+        }
+      }, 25000);
+    }
+  }, 25000);
+  mainWindow.webContents.once('did-finish-load', () => {
+    firstPaint = true;
+    clearTimeout(firstPaintTimer);
+    log('INFO', 'First paint signal: did-finish-load');
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
+    log('WARN', 'Renderer navigation failed', { code, description, url: validatedURL });
+  });
   mainWindow.once('ready-to-show', () => { if (mainWindow) mainWindow.show(); log('INFO', 'Main window ready-to-show'); });
   const fallback = setTimeout(() => {
     if (mainWindow && !mainWindow.isVisible()) { mainWindow.show(); log('WARN', 'ready-to-show timed out; showing window anyway'); }
@@ -221,6 +274,7 @@ if (!hasSingleInstance) {
   app.whenReady().then(() => {
     app.setAppUserModelId('com.mexcel711.zara-ai');
     bootstrapData();
+    registerMediaProtocol();
     registerDesktopHandlers();
     startDesktopAgent();
     createMainWindow();
