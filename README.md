@@ -5,7 +5,8 @@ A bilingual Pakistani Urdu, Roman Urdu and English AI voice assistant built with
 ## Production architecture
 - Cloudflare Worker serves the Vite SPA and API routes.
 - Cloudflare D1 stores conversations, memories, skills, notes, reminders, app configuration, living characters and the study library.
-- Workers AI is available through the `AI` binding. Optional `GEMINI_API_KEY` enables Gemini-backed chat, document analysis, camera vision and audio transcription.
+- Workers AI is the production AI provider through the `AI` binding, with Gemma as the primary conversational model and Llama fallbacks. If `GEMINI_API_KEY` is configured, Gemini can be selected or used as an additional fallback for chat, study/vision analysis and transcription.
+- Chat uses the active character, saved memories, notes, reminders and study-library summaries as context. Provider failures trigger model/provider failover before the API returns a recoverable unavailable response.
 - Production access is restricted by the Cloudflare Access policy. Keep its allow rule limited to trusted identities.
 - The local Express/SQLite runtime and production Worker/D1 runtime share the browser API contract. The Worker-specific route handlers live in `worker/features.ts`.
 
