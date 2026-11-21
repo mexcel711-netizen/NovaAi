@@ -1,4 +1,6 @@
 node_modules/
+desktop-electron/node_modules/
+desktop-electron/release/
 build/
 dist/
 coverage/
