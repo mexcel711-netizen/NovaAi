@@ -1,4 +1,4 @@
-# NOVA AI
+# ZARA AI
 
 A bilingual Pakistani Urdu, Roman Urdu and English AI voice assistant built with React, TypeScript, Cloudflare Workers AI and D1.
 
@@ -36,15 +36,15 @@ bun run deploy
 - Never commit API keys, `.env` files, local SQLite databases, or Wrangler state.
 
 
-## NOVA holographic command centre and desktop companion
+## ZARA AI holographic command centre and desktop companion
 The Home screen includes a holographic command-centre layout and an optional local Desktop Bridge panel.
 
 ### Windows desktop actions
 1. Start the local companion from the repository root: `bun run desktop:companion`.
-2. Copy the one-time pairing token printed in the terminal into NOVA's **Desktop Bridge** panel and press **Pair**.
+2. Copy the one-time pairing token printed in the terminal into ZARA's **Desktop Bridge** panel and press **Pair**.
 3. Use the panel buttons or say/type commands such as `Chrome kholo`, `Edge kholo`, `Notepad kholo`, or `Calculator kholo`.
 
-The companion is an optional local Node.js process. It binds to loopback only, checks the NOVA origin and pairing token, and only launches the small allowlist of applications. See [desktop-companion/README.md](desktop-companion/README.md) for setup and security details.
+The companion is an optional local Node.js process. It binds to loopback only, checks the ZARA origin and pairing token, and only launches the small allowlist of applications. See [desktop-companion/README.md](desktop-companion/README.md) for setup and security details.
 
 ### Pakistani Urdu neural female voice
-NOVA uses one fixed Microsoft Edge neural speaker, `ur-PK-UzmaNeural`, for Urdu, Roman Urdu and English. Character, mood, language and device settings do not switch the speaker. The local Node server and Cloudflare Worker use the same Sec-MS-GEC v2 Read Aloud handshake. Browser SpeechSynthesis and the old Google Translate TTS fallback are disabled so a provider failure never silently changes the voice. If synthesis is temporarily unavailable, the written reply remains visible and NOVA retries the same voice once.
+ZARA uses one fixed Microsoft Edge neural speaker, `ur-PK-UzmaNeural`, for Urdu, Roman Urdu and English. Character, mood, language and device settings do not switch the speaker. The local Node server and Cloudflare Worker use the same Sec-MS-GEC v2 Read Aloud handshake. Browser SpeechSynthesis and the old Google Translate TTS fallback are disabled so a provider failure never silently changes the voice. If synthesis is temporarily unavailable, the written reply remains visible and ZARA retries the same fixed voice once. The app unlocks Web Audio on the first user gesture so delayed TTS responses can play under browser autoplay policies.
