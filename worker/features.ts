@@ -800,6 +800,54 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
     return handleVision(db, env, await parseBody(request));
   }
 
+  if (path === '/api/skills' && method === 'POST') {
+    const body = await parseBody(request);
+    const name = String(body.display_name ?? '').trim().slice(0, 100);
+    const triggers = safeArray<string>(body.trigger_phrases).map((value) => String(value).trim()).filter(Boolean).slice(0, 20);
+    if (!name || !triggers.length) return json({ error: 'Skill name and at least one trigger phrase are required.' }, 400);
+    const actionTypes = new Set(['launch', 'url', 'system', 'ai', 'note', 'reminder', 'calc', 'study', 'vision', 'evolve', 'desktop']);
+    const actionType = String(body.action_type ?? 'url');
+    if (!actionTypes.has(actionType)) return json({ error: 'Unsupported skill action type.' }, 400);
+    await exec(
+      db,
+      'INSERT INTO skills_config(skill_name,display_name,description,trigger_phrases,action_type,action_value,is_enabled,is_custom) VALUES(?,?,?,?,?,?,1,1)',
+      `${makeSlug(name)}_${crypto.randomUUID().slice(0, 6)}`,
+      name,
+      String(body.description ?? 'Custom user automation skill').slice(0, 500),
+      JSON.stringify(triggers),
+      actionType,
+      String(body.action_value ?? '').slice(0, 2000),
+    );
+    return json({ skills: await getSkills(db) });
+  }
+
+  const skillRoute = path.match(/^\\/api\\/skills\\/(\\d+)$/);
+  if (skillRoute && method === 'PATCH') {
+    const body = await parseBody(request);
+    if (typeof body.is_enabled !== 'boolean') return json({ error: 'is_enabled must be a boolean.' }, 400);
+    await exec(db, 'UPDATE skills_config SET is_enabled=? WHERE id=?', body.is_enabled ? 1 : 0, Number(skillRoute[1]));
+    return json({ ok: true, skills: await getSkills(db) });
+  }
+
+  const memoryRoute = path.match(/^\\/api\\/memories\\/(\\d+)$/);
+  if (memoryRoute && method === 'DELETE') {
+    await exec(db, 'UPDATE memories SET is_deleted=1,updated_at=CURRENT_TIMESTAMP WHERE id=?', Number(memoryRoute[1]));
+    return json({ ok: true, memories: await getMemories(db) });
+  }
+
+  const conversationRoute = path.match(/^\\/api\\/conversations\\/([^/]+)$/);
+  if (conversationRoute && method === 'DELETE') {
+    await exec(db, 'DELETE FROM conversations WHERE session_id=?', decodeURIComponent(conversationRoute[1]));
+    const sessions = await all<Row>(
+      db,
+      `SELECT session_id,MIN(timestamp) started_at,MAX(timestamp) last_message_at,COUNT(*) message_count,
+        (SELECT content FROM conversations c2 WHERE c2.session_id=c1.session_id ORDER BY id LIMIT 1) preview,
+        (SELECT language FROM conversations c3 WHERE c3.session_id=c1.session_id ORDER BY id DESC LIMIT 1) primary_language
+        FROM conversations c1 GROUP BY session_id ORDER BY MAX(id) DESC`,
+    );
+    return json({ ok: true, sessions: sessions.map((row) => ({ ...row, message_count: Number(row.message_count) })) });
+  }
+
   // Keep response bodies aligned with the browser's state-update contracts.
   const noteRoute = path.match(/^\/api\/notes\/(\d+)$/);
   if (noteRoute && method === 'DELETE') {
