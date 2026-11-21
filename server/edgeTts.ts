@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import {
   EDGE_TTS_CHROMIUM_VERSION,
@@ -154,10 +154,10 @@ export async function synthesizeUzma(text: string, timeoutMs = 30000): Promise<B
     });
 
     socket.once('error', (error) => finish(error));
-    socket.once('close', (code, reason) => {
+    socket.once('close', (code: number, reason: Buffer) => {
       if (!settled) finish(new Error(`Urdu voice connection closed before completion (${code}): ${reason.toString().slice(0, 120)}`));
     });
-    socket.once('unexpected-response', (_request, response) => {
+    socket.once('unexpected-response', (_request: unknown, response: { statusCode?: number }) => {
       finish(new Error(`Urdu voice provider rejected the connection (HTTP ${response.statusCode || 'unknown'}).`));
     });
   });
