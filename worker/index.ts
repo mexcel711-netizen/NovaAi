@@ -7,7 +7,7 @@ import { handleFeatureRoute } from './features';
 
 interface D1Statement { bind(...v:unknown[]):D1Statement; all<T>():Promise<{results:T[]}>; first<T>():Promise<T|null>; run():Promise<unknown>; }
 interface DB { prepare(sql:string):D1Statement; }
-interface Env { DB:DB; AI?:{run(model:string,input:{messages:Array<{role:string;content:string}>;max_tokens?:number;temperature?:number}):Promise<{response?:string;choices?:Array<{message?:{content?:string}}>}>}; ASSETS:{fetch(r:Request):Promise<Response>}; GEMINI_API_KEY?:string; CLOUDFLARE_MODEL?:string; }
+interface Env { DB:DB; AI?:{run(model:string,input:{messages:Array<{role:string;content:string}>;max_tokens?:number;temperature?:number}):Promise<{response?:string;choices?:Array<{message?:{content?:string}}>}>}; ASSETS:{fetch(r:Request):Promise<Response>}; GEMINI_API_KEY?:string; OPENAI_API_KEY?:string; OPENAI_CHAT_MODEL?:string; OPENAI_TTS_MODEL?:string; CLOUDFLARE_MODEL?:string; }
 const DEFAULT:AppConfig={assistant_name:'ZARA',personality:'warm_urdu_companion',custom_prompt:'Tum ZARA ho — real-life best friend. Roman Urdu mein seedha, chhota aur dostana baat karo. User ko Boss kaho.',language:'bilingual',response_tone:'casual',tts_voice:'ur-PK-UzmaNeural',voice_speed:1,voice_volume:1,stt_model:'base',wake_word:'hey zara',wake_word_enabled:false,auto_speak:true,deep_thinking_mode:'auto',default_model:'gemini-4-hydrogen',ai_provider:'auto',active_mood:'auto',active_character_id:2,hands_free_mode:false,camera_awareness_enabled:false,hairstyle:'wavy',user_name:'Boss',user_nickname:'Boss',assistant_age:'21',onboarding_completed:false,whatsapp_number:'',referral_source:'',auto_usb_transfer:false,last_usb_sync_at:'',last_usb_drive_label:''};
 const json=(x:unknown,s=200)=>Response.json(x,{status:s,headers:{'Cache-Control':'no-store'}});
 const all=async<T>(db:DB,q:string,...v:unknown[]) => (await db.prepare(q).bind(...v).all<T>()).results;
@@ -17,6 +17,24 @@ const arr=(v:string)=>{try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}ca
 async function getConfig(db:DB):Promise<AppConfig>{const r=await all<{key:string;value:string}>(db,'SELECT key,value FROM app_config');const m=new Map<string,string>(r.map(x=>[x.key,x.value] as [string,string]));const num=(k:string,d:number,min:number,max:number)=>{const n=Number(m.get(k));return Number.isFinite(n)&&n>=min&&n<=max?n:d;};return {...DEFAULT,assistant_name:m.get('assistant_name')||DEFAULT.assistant_name,personality:(m.get('personality')||DEFAULT.personality) as AppConfig['personality'],custom_prompt:m.get('custom_prompt')??DEFAULT.custom_prompt,language:(m.get('language')||DEFAULT.language) as AppConfig['language'],response_tone:(m.get('response_tone')||DEFAULT.response_tone) as AppConfig['response_tone'],tts_voice:m.get('tts_voice')||DEFAULT.tts_voice,voice_speed:num('voice_speed',1,.5,1.75),voice_volume:num('voice_volume',1,0,1.5),stt_model:(m.get('stt_model')||'base') as AppConfig['stt_model'],wake_word:m.get('wake_word')||'hey zara',wake_word_enabled:m.get('wake_word_enabled')==='true',auto_speak:m.get('auto_speak')!=='false',deep_thinking_mode:(m.get('deep_thinking_mode')||'auto') as AppConfig['deep_thinking_mode'],default_model:(m.get('default_model')||'gemini-4-hydrogen') as AppConfig['default_model'],ai_provider:(m.get('ai_provider')||'auto') as AppConfig['ai_provider'],active_mood:(m.get('active_mood')||'auto') as AppConfig['active_mood'],active_character_id:num('active_character_id',1,1,999999),hands_free_mode:m.get('hands_free_mode')==='true',camera_awareness_enabled:m.get('camera_awareness_enabled')==='true',hairstyle:(m.get('hairstyle')||'wavy') as AppConfig['hairstyle'],user_name:m.get('user_name')||'Boss',user_nickname:m.get('user_nickname')||'Boss',assistant_age:m.get('assistant_age')||'21',onboarding_completed:m.get('onboarding_completed')==='true',whatsapp_number:m.get('whatsapp_number')||'',referral_source:m.get('referral_source')||''};}
 async function getState(db:DB,env:Env){const [cfg,skills,memories,notes,reminders,sessions]=await Promise.all([getConfig(db),all<any>(db,'SELECT * FROM skills_config ORDER BY is_custom DESC,id'),all<any>(db,'SELECT * FROM memories WHERE is_deleted=0 ORDER BY id DESC'),all<any>(db,'SELECT * FROM notes ORDER BY id DESC'),all<any>(db,'SELECT * FROM reminders ORDER BY is_done,id DESC'),all<any>(db,`SELECT session_id,MIN(timestamp) started_at,MAX(timestamp) last_message_at,COUNT(*) message_count,(SELECT content FROM conversations c2 WHERE c2.session_id=c1.session_id ORDER BY id LIMIT 1) preview,(SELECT language FROM conversations c3 WHERE c3.session_id=c1.session_id ORDER BY id DESC LIMIT 1) primary_language FROM conversations c1 GROUP BY session_id ORDER BY MAX(id) DESC`)]);for(const x of skills){x.trigger_phrases=arr(x.trigger_phrases);x.is_enabled=!!x.is_enabled;x.is_custom=!!x.is_custom;}for(const x of notes)x.tags=arr(x.tags);for(const x of reminders)x.is_done=!!x.is_done;const providerStatus:ProviderStatus=resolveActiveAiProvider({preference:cfg.ai_provider,hasCloudflareBinding:!!env.AI,hasCloudflareRest:false,hasGoogleAiKey:!!env.GEMINI_API_KEY});return {config:cfg,skills,memories,notes,reminders,sessions,providerStatus};}
 async function save(db:DB,s:any){await exec(db,'INSERT INTO conversations(session_id,role,content,language,emotion,model_used,provider_used,thinking_used,skill_executed) VALUES(?,?,?,?,?,?,?,?,?)',s.sessionId,s.role,s.content,s.language,s.emotion||'calm',s.modelUsed||null,s.providerUsed||null,s.thinkingUsed?1:0,s.skillExecuted||null);}
+async function openAiChat(env:Env,prompt:string,history:any[],msg:string,thinking:boolean):Promise<{text:string;model:string}>{
+  if(!env.OPENAI_API_KEY)throw new Error('OPENAI_API_KEY is not configured');
+  const model=env.OPENAI_CHAT_MODEL||(thinking?'gpt-5.5':'gpt-5.5');
+  const input=[...history.map(x=>({role:x.role==='assistant'?'assistant':'user',content:x.content})),{role:'user',content:msg}];
+  const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model,instructions:prompt,input,max_output_tokens:1800,store:false}),signal:AbortSignal.timeout(45000)});
+  const data=await response.json() as any;
+  if(!response.ok)throw new Error(data.error?.message||'OpenAI Responses API request failed');
+  const text=Array.isArray(data.output)?data.output.filter((x:any)=>x.type==='message').flatMap((x:any)=>x.content||[]).filter((x:any)=>x.type==='output_text').map((x:any)=>x.text||'').join(''):String(data.output_text||'');
+  if(!text.trim())throw new Error('OpenAI returned an empty response');
+  return {text,model};
+}
+async function openAiSpeech(text:string,env:Env):Promise<string>{
+  if(!env.OPENAI_API_KEY)throw new Error('OPENAI_API_KEY is not configured');
+  if(text.length>4096)throw new Error('Speech text exceeds OpenAI TTS 4096-character limit.');
+  const response=await fetch('https://api.openai.com/v1/audio/speech',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_TTS_MODEL||'gpt-4o-mini-tts',voice:'marin',input:text,instructions:'Speak naturally and warmly in Pakistani Urdu (Urdu Pakistan accent). Pronounce Urdu words clearly, with a friendly female assistant style, conversational pace, gentle intonation, and no exaggerated robotic delivery.',response_format:'mp3'}),signal:AbortSignal.timeout(45000)});
+  if(!response.ok){const detail=await response.text();throw new Error('OpenAI speech error ('+response.status+'): '+detail.slice(0,500));}
+  const bytes=new Uint8Array(await response.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+0x8000,bytes.length)));return btoa(binary);
+}
 async function chat(request:Request,env:Env){const b=await request.json() as any,msg=String(b.message||'').trim();if(!msg||msg.length>12000)return json({error:'Message must be 1–12,000 characters.'},400);const db=env.DB,cfg=await getConfig(db),sessionId=String(b.sessionId||crypto.randomUUID()).slice(0,120),lang=detectUrduIntent(msg)?'ur':'en';await save(db,{sessionId,role:'user',content:msg,language:lang,emotion:detectEmotionFromText(msg)});const extracted=extractMemoriesFromUtterance(msg);for(const m of extracted){const found=await one<any>(db,'SELECT id FROM memories WHERE is_deleted=0 AND LOWER(value)=LOWER(?)',m.value);if(!found)await exec(db,'INSERT INTO memories(category,key,value,source,confidence) VALUES(?,?,?,?,?)',m.category,m.key,m.value,m.source,m.confidence);}
 const sk=await all<any>(db,'SELECT * FROM skills_config WHERE is_enabled=1');for(const x of sk)x.trigger_phrases=arr(x.trigger_phrases);const match=matchSkillCommand(msg,sk as any);if(match.matched&&match.responseText){const side=match.sideEffect;if(side?.type==='create_note'&&side.noteContent)await exec(db,'INSERT INTO notes(title,content,tags) VALUES(?,?,?)',side.noteTitle||'Quick Note',side.noteContent,'["voice"]');if(side?.type==='create_reminder'&&side.reminderTitle)await exec(db,'INSERT INTO reminders(title,remind_at) VALUES(?,?)',side.reminderTitle,side.reminderAt||'Today');const emotion=match.emotion||detectEmotionFromText(match.responseText);await save(db,{sessionId,role:'assistant',content:match.responseText,language:match.language||lang,emotion,modelUsed:'skill-engine',providerUsed:'local-skill',skillExecuted:match.skillName});return json({reply:match.responseText,emotion,language:match.language||lang,modelUsed:'skill-engine',providerUsed:'local-skill',thinkingUsed:false,skillExecuted:match.skillName,sideEffect:side,extractedMemories:extracted} satisfies ChatApiResponse);}
 const history=await all<any>(db,'SELECT role,content FROM conversations WHERE session_id=? ORDER BY id DESC LIMIT 12',sessionId);
@@ -57,6 +75,7 @@ const prompt = [
 
 const thinking=!!b.forceThinking||cfg.deep_thinking_mode==='always'||(cfg.deep_thinking_mode==='auto'&&isComplexThinkingQuery(msg));
 let raw='',model='',provider='',providerErrors:string[]=[];
+const runOpenAI=async():Promise<boolean>=>{if(!env.OPENAI_API_KEY)return false;try{const result=await openAiChat(env,prompt,history,msg,thinking);raw=result.text;model=result.model;provider='openai';return true;}catch(error){providerErrors.push('OpenAI: '+(error instanceof Error?error.message:'unavailable'));return false;}};
 const runGemini=async():Promise<boolean>=>{
   if(!env.GEMINI_API_KEY)return false;
   const selected=thinking?'gemini-2.5-pro':'gemini-2.5-flash';
@@ -101,7 +120,8 @@ const runCloudflare=async():Promise<boolean>=>{
 
 // Respect the explicit provider where possible, then fail over instead of returning a 500.
 let completed=false;
-if(cfg.ai_provider==='google-ai-studio'&&env.GEMINI_API_KEY)completed=await runGemini();
+if(env.OPENAI_API_KEY)completed=await runOpenAI();
+if(!completed&&cfg.ai_provider==='google-ai-studio'&&env.GEMINI_API_KEY)completed=await runGemini();
 if(!completed)completed=await runCloudflare();
 if(!completed&&env.GEMINI_API_KEY)completed=await runGemini();
 if(!completed||!raw.trim()){
@@ -130,12 +150,18 @@ if(p==='/api/tts'&&m==='POST'){
   if(!text||text.length>6000)return json({error:'Text required (max 6000 characters)'},400);
   let audioBase64='';
   let lastError='Voice synthesis failed.';
-  for(let attempt=0;attempt<2;attempt+=1){
-    try{audioBase64=await synthesizeUzmaInWorker(text,30000);break;}
-    catch(error){lastError=error instanceof Error?error.message:lastError;if(attempt===0)await new Promise(resolve=>setTimeout(resolve,400));}
+  if(env.OPENAI_API_KEY){
+    try{audioBase64=await openAiSpeech(text,env);}
+    catch(error){lastError=error instanceof Error?error.message:lastError;console.error(JSON.stringify({path:'/api/tts',engine:'openai',textLength:text.length,error:lastError}));}
+  }
+  if(!audioBase64){
+    for(let attempt=0;attempt<2;attempt+=1){
+      try{audioBase64=await synthesizeUzmaInWorker(text,30000);break;}
+      catch(error){lastError=error instanceof Error?error.message:lastError;if(attempt===0)await new Promise(resolve=>setTimeout(resolve,400));}
+    }
   }
   if(!audioBase64){console.error(JSON.stringify({path:'/api/tts',voice:'ur-PK-UzmaNeural',attempts:2,textLength:text.length,error:lastError}));return json({error:lastError},503);}
-  return json({audioChunks:[{audioBase64,mimeType:'audio/mpeg'}],engine:'edge-neural-v2',voice:'ur-PK-UzmaNeural'});
+  return json({audioChunks:[{audioBase64,mimeType:'audio/mpeg'}],engine:env.OPENAI_API_KEY?'openai-tts':'edge-neural-v2',voice:env.OPENAI_API_KEY?'marin':'ur-PK-UzmaNeural'});
 }
 if(p.startsWith('/api/'))return json({error:'Not found'},404);return env.ASSETS.fetch(request);
 }catch(e){console.error(JSON.stringify({path:p,error:e instanceof Error?e.message:'unknown'}));return json({error:e instanceof Error?e.message:'Internal server error'},500);}}};
