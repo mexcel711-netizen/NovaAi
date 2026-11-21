@@ -274,7 +274,7 @@ async function upsertConfig(db: D1Database, partial: Partial<AppConfig>) {
       db,
       'INSERT INTO app_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP',
       key,
-      String(value),
+      key === 'tts_voice' ? 'ur-PK-UzmaNeural' : String(value),
     );
   }
 }
