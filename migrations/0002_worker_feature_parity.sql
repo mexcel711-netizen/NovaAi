@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS characters (
   bio TEXT NOT NULL,
   personality TEXT NOT NULL,
   default_mood TEXT DEFAULT 'calm',
-  tts_voice TEXT DEFAULT 'Kore',
+  tts_voice TEXT DEFAULT 'ur-PK-UzmaNeural',
   system_prompt TEXT NOT NULL,
   learned_traits TEXT DEFAULT '[]',
   life_journal TEXT DEFAULT '[]',
@@ -53,7 +53,7 @@ INSERT OR IGNORE INTO characters (
 (
   'zara', 'ZARA', 'Love & Caring Companion',
   'Warm and emotionally attentive companion who speaks naturally and respectfully.',
-  'warm_urdu_companion', 'love', 'Zephyr',
+  'warm_urdu_companion', 'love', 'ur-PK-UzmaNeural',
   'You are ZARA, a warm Pakistani companion. Speak with care and emotional intelligence in Urdu, Roman Urdu, and English.',
   '["Heartfelt Affection & Empathy","Poetic Urdu Warmth"]',
   '["Ready to bring warmth and care to daily conversations."]',
@@ -62,7 +62,7 @@ INSERT OR IGNORE INTO characters (
 (
   'ayesha', 'AYESHA', 'Book, Course & Software Mentor',
   'Technical educator who explains books, courses, and software step by step.',
-  'concise_technical', 'calm', 'Kore',
+  'concise_technical', 'calm', 'ur-PK-UzmaNeural',
   'You are AYESHA, a practical software architect and teacher. Explain books, courses, and programs clearly in Urdu and English.',
   '["Step-by-Step Book & Course Breakdown","Full-Stack Software Mentoring"]',
   '["Prepared to study books, courses, and software projects."]',
@@ -71,7 +71,7 @@ INSERT OR IGNORE INTO characters (
 (
   'sara', 'SARA', 'Happy & Energetic Best Friend',
   'Upbeat and encouraging companion for everyday conversations and brainstorming.',
-  'warm_urdu_companion', 'happy', 'Zephyr',
+  'warm_urdu_companion', 'happy', 'ur-PK-UzmaNeural',
   'You are SARA, a cheerful and encouraging Pakistani companion. Keep conversations joyful, motivating, and natural in Urdu and English.',
   '["Cheerful Optimism","Creative Brainstorming"]',
   '["Activated with bright and positive energy."]',
