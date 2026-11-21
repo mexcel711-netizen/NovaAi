@@ -1,5 +1,4 @@
 import type { FacialEmotion } from '../types/nova';
-import { getDesktopBridgeToken } from './desktopBridge';
 
 // Client-side neural audio playback (Web Audio API with real-time FFT lip-sync),
 // speed/volume controls, and SpeechRecognition helpers.
@@ -79,203 +78,74 @@ export async function speakText(params: {
 
   const controller = new AbortController();
   activeAbortController = controller;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    params.onLipSync?.(0, 0);
+    if (activeAbortController === controller) activeAbortController = null;
+    params.onEnd?.();
+  };
   params.onStart?.();
 
-  let engineUsed = 'urdu-neural-https';
-
   try {
-    // When paired, prefer Microsoft Edge neural voices locally (Pakistani Urdu Uzma).
-    const desktopToken = getDesktopBridgeToken();
-    if (desktopToken) {
+    // The server always synthesizes the same ur-PK-UzmaNeural speaker.
+    // Language, emotion, active character and device never select another voice.
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const localResponse = await fetch('http://127.0.0.1:3210/v1/tts', {
+        response = await fetch('/api/tts', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${desktopToken}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: cleanText.slice(0, 2500),
-            voice: params.language === 'ur' ? 'ur-PK-UzmaNeural' : 'en-US-JennyNeural',
+            text: cleanText,
+            voiceName: 'ur-PK-UzmaNeural',
             emotion: params.emotion || 'calm',
+            language: params.language,
           }),
           signal: controller.signal,
         });
-        if (localResponse.ok) {
-          const localData = await localResponse.json() as {
-            audioChunks?: Array<{ audioBase64: string; mimeType: string }>;
-            engine?: string;
-          };
-          if (localData.audioChunks?.length) {
-            engineUsed = localData.engine || 'microsoft-edge-neural';
-            const speed = Math.min(1.6, Math.max(0.65, params.voiceSpeed ?? 1));
-            const volume = Math.min(1.5, Math.max(0, params.voiceVolume ?? 1));
-            for (const chunk of localData.audioChunks) {
-              if (controller.signal.aborted) break;
-              await playBufferWithLipSync({
-                base64: chunk.audioBase64,
-                speed,
-                volume,
-                signal: controller.signal,
-                onLipSync: params.onLipSync,
-              });
-            }
-            params.onLipSync?.(0, 0);
-            params.onEnd?.();
-            return { engine: engineUsed };
-          }
-        }
+        if (response.ok) break;
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        lastError = new Error(body.error || `Voice service returned HTTP ${response.status}.`);
       } catch (error) {
         if (controller.signal.aborted) throw error;
-        // Continue with hosted TTS if the desktop companion is offline.
+        lastError = error instanceof Error ? error : new Error('Voice service unavailable.');
       }
+      if (attempt === 0 && !controller.signal.aborted) await waitMs(350, controller.signal);
     }
 
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: cleanText,
-        voiceName: params.voiceName,
-        emotion: params.emotion || 'calm',
-        language: params.language,
-      }),
-      signal: controller.signal,
-    });
+    if (!response?.ok) throw lastError || new Error('Pakistani Urdu voice is temporarily unavailable.');
+    const data = await response.json() as {
+      audioChunks?: Array<{ audioBase64: string; mimeType: string }>;
+      engine?: string;
+      voice?: string;
+    };
+    const chunks = data.audioChunks ?? [];
+    if (!chunks.length) throw new Error('Pakistani Urdu voice returned no audio.');
+    const speed = Math.min(1.6, Math.max(0.65, params.voiceSpeed ?? 1));
+    const volume = Math.min(1.5, Math.max(0, params.voiceVolume ?? 1));
 
-    if (res.ok) {
-      const data = (await res.json()) as {
-        audioChunks?: Array<{ audioBase64: string; mimeType: string }>;
-        engine?: string;
-      };
-      if (data.engine) engineUsed = data.engine;
-
-      const chunks = data.audioChunks ?? [];
-      if (chunks.length > 0 && !controller.signal.aborted) {
-        const speed = Math.min(1.6, Math.max(0.65, params.voiceSpeed ?? 1.0));
-        const volume = Math.min(1.5, Math.max(0.0, params.voiceVolume ?? 1.0));
-
-        for (let i = 0; i < chunks.length; i++) {
-          if (controller.signal.aborted) break;
-          await playBufferWithLipSync({
-            base64: chunks[i].audioBase64,
-            speed,
-            volume,
-            signal: controller.signal,
-            onLipSync: params.onLipSync,
-          });
-          // Natural brief breathing pause between phrases
-          if (i < chunks.length - 1 && !controller.signal.aborted) {
-            params.onLipSync?.(0, 0);
-            await waitMs(55, controller.signal);
-          }
-        }
-        params.onLipSync?.(0, 0);
-        params.onEnd?.();
-        return { engine: engineUsed };
-      }
+    for (const chunk of chunks) {
+      if (controller.signal.aborted) break;
+      await playBufferWithLipSync({
+        base64: chunk.audioBase64,
+        speed,
+        volume,
+        signal: controller.signal,
+        onLipSync: params.onLipSync,
+      });
     }
-  } catch (err) {
-    if (controller.signal.aborted) {
-      params.onLipSync?.(0, 0);
-      params.onEnd?.();
-      return { engine: 'aborted' };
-    }
-    void err;
+    finish();
+    return { engine: data.engine || 'edge-neural-v2' };
+  } catch (error) {
+    finish();
+    if (controller.signal.aborted) return { engine: 'aborted' };
+    // Never switch to another system voice. Chat text stays available while
+    // the same fixed neural speaker can be retried on the next interaction.
+    return { engine: 'voice-unavailable' };
   }
-
-  // Browser female SpeechSynthesis safety fallback if server returned 0 chunks
-  if (!controller.signal.aborted) {
-    const playedBrowser = await playBrowserSpeechFallback({
-      text: cleanText,
-      language: params.language,
-      speed: params.voiceSpeed ?? 1.0,
-      volume: params.voiceVolume ?? 1.0,
-      signal: controller.signal,
-      onLipSync: params.onLipSync,
-    });
-    if (playedBrowser) {
-      params.onLipSync?.(0, 0);
-      params.onEnd?.();
-      return { engine: 'browser-speech-synthesis' };
-    }
-  }
-
-  params.onLipSync?.(0, 0);
-  params.onEnd?.();
-  return { engine: engineUsed };
-}
-
-function playBrowserSpeechFallback(params: {
-  text: string;
-  language: 'en' | 'ur';
-  speed: number;
-  volume: number;
-  signal: AbortSignal;
-  onLipSync?: (openness: number, width: number) => void;
-}): Promise<boolean> {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return Promise.resolve(false);
-  }
-  return new Promise((resolve) => {
-    try {
-      const utter = new SpeechSynthesisUtterance(params.text);
-      const voices = window.speechSynthesis.getVoices();
-      const preferredFemale =
-        voices.find((v) =>
-          params.language === 'ur'
-            ? /ur|hi|pak|india/i.test(v.lang) && /female|uzma|swara|heera|lekha|google/i.test(v.name)
-            : /female|jenny|zira|samantha|victoria|karen|aria|google uk english female/i.test(v.name)
-        ) ||
-        voices.find((v) => /female|woman|girl|zira|samantha|aria|jenny|google/i.test(v.name)) ||
-        voices[0];
-
-      if (preferredFemale) {
-        utter.voice = preferredFemale;
-        utter.lang = preferredFemale.lang;
-      } else {
-        utter.lang = params.language === 'ur' ? 'hi-IN' : 'en-US';
-      }
-      utter.rate = Math.min(1.4, Math.max(0.75, params.speed));
-      utter.volume = Math.min(1, Math.max(0, params.volume));
-      utter.pitch = 1.08;
-
-      let animId = 0;
-      let startTs = performance.now();
-      const pumpLips = () => {
-        if (params.signal.aborted) return;
-        const elapsed = (performance.now() - startTs) / 1000;
-        const open = 0.28 + Math.abs(Math.sin(elapsed * 11.5)) * 0.45;
-        const width = 0.22 + Math.abs(Math.cos(elapsed * 8.2)) * 0.35;
-        params.onLipSync?.(open, width);
-        animId = requestAnimationFrame(pumpLips);
-      };
-
-      const finish = (ok: boolean) => {
-        if (animId) cancelAnimationFrame(animId);
-        params.onLipSync?.(0, 0);
-        resolve(ok);
-      };
-
-      utter.onstart = () => {
-        startTs = performance.now();
-        pumpLips();
-      };
-      utter.onend = () => finish(true);
-      utter.onerror = () => finish(false);
-      params.signal.addEventListener(
-        'abort',
-        () => {
-          window.speechSynthesis.cancel();
-          finish(false);
-        },
-        { once: true }
-      );
-
-      // Guard if browser synthesis never fires onend in headless environments
-      setTimeout(() => finish(false), Math.min(18000, Math.max(4500, params.text.length * 95)));
-      window.speechSynthesis.speak(utter);
-    } catch {
-      resolve(false);
-    }
-  });
 }
 
 function waitMs(ms: number, signal: AbortSignal): Promise<void> {
@@ -296,6 +166,42 @@ function waitMs(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+async function playMp3Element(
+  base64: string,
+  speed: number,
+  volume: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (typeof Audio === 'undefined' || signal.aborted) return;
+  const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+  audio.preload = 'auto';
+  audio.playbackRate = Math.min(1.6, Math.max(0.65, speed));
+  audio.volume = Math.min(1, Math.max(0, volume));
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      audio.onended = null;
+      audio.onerror = null;
+      signal.removeEventListener('abort', onAbort);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onAbort = () => {
+      audio.pause();
+      audio.currentTime = 0;
+      finish();
+    };
+    audio.onended = () => finish();
+    audio.onerror = () => finish(new Error('Audio playback failed.'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    void audio.play().catch((error: unknown) => {
+      finish(error instanceof Error ? error : new Error('Audio playback is blocked.'));
+    });
+  });
+}
+
 async function playBufferWithLipSync(params: {
   base64: string;
   speed: number;
@@ -304,7 +210,17 @@ async function playBufferWithLipSync(params: {
   onLipSync?: (openness: number, width: number) => void;
 }): Promise<void> {
   const ctx = getAudioContext();
-  if (!ctx) return;
+  if (!ctx) {
+    await playMp3Element(params.base64, params.speed, params.volume, params.signal);
+    return;
+  }
+
+  try {
+    if (ctx.state === 'suspended') await ctx.resume();
+  } catch {
+    await playMp3Element(params.base64, params.speed, params.volume, params.signal);
+    return;
+  }
 
   const binary = atob(params.base64);
   const bytes = new Uint8Array(binary.length);
@@ -316,6 +232,7 @@ async function playBufferWithLipSync(params: {
   try {
     audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
   } catch {
+    await playMp3Element(params.base64, params.speed, params.volume, params.signal);
     return;
   }
 

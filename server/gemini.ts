@@ -1,11 +1,10 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { UniversalEdgeTTS } from 'edge-tts-universal';
+import { synthesizeUzma } from './edgeTts';
 import {
   buildQuickUrduPhoneticScript,
   extractEmotionAndCleanText,
   formatExpressiveSpeechPrompt,
   isRomanUrduText,
-  splitSpeechChunks,
 } from '../src/lib/emotionAndSpeech';
 import type {
   AppConfig,
@@ -541,31 +540,8 @@ export async function executeStudyTaskWithAi(params: {
   };
 }
 
-async function synthesizeEdgeTtsWithTimeout(
-  text: string,
-  voiceName: string,
-  timeoutMs = 2400
-): Promise<Array<{ audioBase64: string; mimeType: string }>> {
-  const work = async () => {
-    const tts = new UniversalEdgeTTS(text, voiceName, { rate: '+2%', pitch: '+3Hz' });
-    const result = await tts.synthesize();
-    const arr = Buffer.from(await result.audio.arrayBuffer());
-    if (arr.length === 0) return [];
-    return [{ audioBase64: arr.toString('base64'), mimeType: 'audio/mpeg' }];
-  };
-  return Promise.race([
-    work(),
-    new Promise<Array<{ audioBase64: string; mimeType: string }>>((resolve) =>
-      setTimeout(() => resolve([]), timeoutMs)
-    ),
-  ]);
-}
-
 /**
- * Generates authentic, expressive female neural speech:
- * 1. Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts` -> `gemini-3.8-flash-lite-tts`) when GEMINI_API_KEY is available
- * 2. Microsoft Edge Neural (`ur-PK-UzmaNeural` / `en-US-JennyNeural`) via fast timeout race
- * 3. Smart Neural HTTPS fallback (`ur` for Urdu script, `hi` for Roman Urdu natural pronunciation, `en` for English)
+ * Generates all NOVA speech through one fixed Microsoft Pakistani Urdu Neural speaker.
  */
 async function transliterateToNaturalUrduForSpeech(
   text: string,
@@ -609,149 +585,40 @@ export async function generateNovaSpeech(params: {
   language: 'en' | 'ur';
 }): Promise<{
   audioChunks: Array<{ audioBase64: string; mimeType: string }>;
-  engine: 'gemini-3.8-flash-tts' | 'gemini-3.8-flash-lite-tts' | 'gemini-2.5-flash-preview-tts' | 'edge-neural' | 'urdu-neural-https';
+  engine: 'edge-neural-v2';
 }> {
-  const diagnostics: string[] = [];
+  const cleanText = params.text.trim();
+  if (!cleanText) return { audioChunks: [], engine: 'edge-neural-v2' };
+
+  // One stable Pakistani voice for every language, emotion and character.
+  // Transliteration is only for pronunciation; it never changes the speaker.
   const ai = hasGoogleAiKey() ? getAiClient() : null;
-
-  // Convert Roman Urdu -> genuine Urdu script before TTS so Pakistani pronunciation is natural & authentic
-  const shouldSpeakUrdu = params.language === 'ur' || isRomanUrduText(params.text);
+  const shouldSpeakUrdu = params.language === 'ur' || isRomanUrduText(cleanText);
   const speechText = shouldSpeakUrdu
-    ? await transliterateToNaturalUrduForSpeech(params.text, ai)
-    : params.text;
+    ? await transliterateToNaturalUrduForSpeech(cleanText, ai)
+    : cleanText;
 
-  if (ai) {
-    const apiKey = process.env.GEMINI_API_KEY?.trim() || '';
-    const aiAlpha = new GoogleGenAI({
-      apiKey,
-      apiVersion: 'v1alpha',
-      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-    });
-
-    const validVoices = new Set(['Zephyr', 'Kore', 'Puck', 'Charon', 'Fenrir']);
-    const voice = validVoices.has(params.voiceName) ? params.voiceName : 'Kore';
-
-    const { textWithBreaths, styleInstruction } = formatExpressiveSpeechPrompt(
-      speechText.slice(0, 1200),
-      params.emotion
-    );
-
-    const ttsAttempts: Array<{
-      client: GoogleGenAI;
-      label: string;
-      model: 'gemini-3.8-flash-tts' | 'gemini-3.8-flash-lite-tts' | 'gemini-2.5-flash-preview-tts';
-      withMetadata: boolean;
-      withSpeechConfig: boolean;
-    }> = [
-      { client: aiAlpha, label: 'alpha-3.8-tts', model: 'gemini-3.8-flash-tts', withMetadata: true, withSpeechConfig: true },
-      { client: aiAlpha, label: 'alpha-3.8-lite', model: 'gemini-3.8-flash-lite-tts', withMetadata: true, withSpeechConfig: true },
-      { client: ai, label: 'beta-2.5-tts', model: 'gemini-2.5-flash-preview-tts', withMetadata: false, withSpeechConfig: true },
-      { client: ai, label: 'beta-3.8-plain', model: 'gemini-3.8-flash-lite-tts', withMetadata: false, withSpeechConfig: false },
-    ];
-
-    for (const attempt of ttsAttempts) {
-      try {
-        const partPayload = attempt.withMetadata
-          ? {
-              text: textWithBreaths,
-              speechMetadata: { style: styleInstruction },
-            }
-          : {
-              text: `Speak warmly and naturally in an authentic young Pakistani female voice (${styleInstruction}): ${speechText.slice(0, 1200)}`,
-            };
-
-        const configPayload: Record<string, unknown> = {
-          responseModalities: ['AUDIO'],
-        };
-        if (attempt.withSpeechConfig) {
-          configPayload.speechConfig = {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice },
-            },
-          };
-        }
-
-        const response = await attempt.client.models.generateContent({
-          model: attempt.model,
-          contents: [{ role: 'user', parts: [partPayload] }],
-          config: configPayload,
-        });
-
-        const part = response.candidates?.[0]?.content?.parts?.[0];
-        const base64Audio = part?.inlineData?.data;
-        if (base64Audio) {
-          return {
-            audioChunks: [
-              {
-                audioBase64: base64Audio,
-                mimeType: part?.inlineData?.mimeType || 'audio/wav',
-              },
-            ],
-            engine: attempt.model,
-          };
-        }
-        diagnostics.push(`${attempt.label}: empty audio part`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        diagnostics.push(`${attempt.label}: ${msg.slice(0, 140)}`);
-      }
-    }
-  }
-
-  // Tier 2: Edge Neural (ur-PK-UzmaNeural / en-US-JennyNeural) with 1.4s fast race
-  try {
-    const hasUrduScript = /[\u0600-\u06FF]/.test(speechText);
-    const edgeVoice =
-      hasUrduScript || params.language === 'ur' || isRomanUrduText(speechText)
-        ? 'ur-PK-UzmaNeural'
-        : 'en-US-JennyNeural';
-    const edgeChunks = await synthesizeEdgeTtsWithTimeout(speechText.slice(0, 650), edgeVoice, 1400);
-    if (edgeChunks.length > 0) {
-      return {
-        audioChunks: edgeChunks,
-        engine: 'edge-neural',
-      };
-    }
-  } catch {
-    // Edge WSS unreachable; proceed to HTTPS chunked neural TTS
-  }
-
-  // Tier 3: Chunked HTTPS Neural Pakistani Urdu (`tl=ur` on Urdu script) / English fallback
-  if (diagnostics.length > 0) {
-    console.warn('Gemini TTS fallback active:', diagnostics.join(' | '));
-  }
-  const chunks = splitSpeechChunks(speechText, 165);
-  const audioChunks: Array<{ audioBase64: string; mimeType: string }> = [];
-
-  for (const chunk of chunks.slice(0, 8)) {
-    const hasUrduScript = /[\u0600-\u06FF]/.test(chunk);
-    const tl = hasUrduScript ? 'ur' : isRomanUrduText(chunk) || params.language === 'ur' ? 'hi' : 'en';
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${tl}&client=tw-ob`;
+  let audio: Buffer | null = null;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const resp = await fetch(ttsUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36',
-        },
-        signal: AbortSignal.timeout(4000),
-      });
-      if (resp.ok) {
-        const buf = Buffer.from(await resp.arrayBuffer());
-        if (buf.length > 0) {
-          audioChunks.push({
-            audioBase64: buf.toString('base64'),
-            mimeType: 'audio/mpeg',
-          });
-        }
-      }
-    } catch {
-      // Skip chunk if offline; client will use browser female voice synthesis fallback
+      audio = await synthesizeUzma(speechText, 30000);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 450));
     }
+  }
+
+  if (!audio?.length) {
+    const message = lastError instanceof Error ? lastError.message : 'Urdu voice synthesis failed.';
+    console.warn('NOVA Urdu voice unavailable:', message);
+    throw new Error('Pakistani Urdu Neural voice is temporarily unavailable.');
   }
 
   return {
-    audioChunks,
-    engine: 'urdu-neural-https',
+    audioChunks: [{ audioBase64: audio.toString('base64'), mimeType: 'audio/mpeg' }],
+    engine: 'edge-neural-v2',
   };
 }
 

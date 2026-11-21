@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL
 INSERT OR IGNORE INTO app_config(key,value) VALUES
  ('assistant_name','NOVA'),('personality','friendly_professional'),
  ('custom_prompt','You are NOVA, a warm Pakistani female AI assistant fluent in Urdu, Roman Urdu and English.'),
- ('language','bilingual'),('response_tone','casual'),('tts_voice','Kore'),
+ ('language','bilingual'),('response_tone','casual'),('tts_voice','ur-PK-UzmaNeural'),
  ('voice_speed','1'),('voice_volume','1'),('stt_model','base'),
  ('wake_word','hey nova'),('wake_word_enabled','false'),('auto_speak','true'),
  ('deep_thinking_mode','auto'),('default_model','gemini-4-hydrogen'),('ai_provider','auto');

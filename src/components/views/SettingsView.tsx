@@ -18,10 +18,7 @@ interface SettingsViewProps {
 type SettingsTab = 'ai' | 'voice' | 'mic' | 'laptop' | 'privacy';
 
 const VOICE_OPTIONS = [
-  { id: 'Zephyr', label: 'Zephyr — Warm Realistic Female (Recommended)' },
-  { id: 'Kore', label: 'Kore — Expressive Pakistani Female' },
-  { id: 'ur-PK-UzmaNeural', label: 'Uzma Neural — Pakistani Urdu Female' },
-  { id: 'en-US-JennyNeural', label: 'Jenny Neural — English Female' },
+  { id: 'ur-PK-UzmaNeural', label: 'Uzma Neural — Pakistani Urdu Female (Locked)' },
 ];
 
 export function SettingsView({
@@ -343,11 +340,13 @@ export function SettingsView({
                 htmlFor="settings-tts-voice"
                 className="block text-xs font-medium text-slate-300"
               >
-                Microsoft Neural Female Voice Persona
+                Fixed Pakistani Female Neural Voice
               </label>
-              <p className="mt-1 text-xs leading-relaxed text-cyan-200/75">For the natural Pakistani Urdu voice, start and pair the NOVA Desktop Companion. It uses Microsoft Edge Neural Uzma locally; without pairing, the hosted fallback may sound less expressive.</p>
+              <p className="mt-1 text-xs leading-relaxed text-cyan-200/75">NOVA ka speaker lock hai: Microsoft Edge Neural ur-PK-UzmaNeural. Urdu, English, mood ya character change honay par bhi awaaz nahi badlay gi. Audio service unavailable ho to NOVA doosri system voice par switch nahi karegi.</p>
               <div className="mt-1.5 flex flex-wrap items-center gap-3">
                 <select
+                  disabled
+                  aria-label="Fixed Pakistani Urdu voice"
                   id="settings-tts-voice"
                   value={draft.tts_voice}
                   onChange={(e) => setDraft({ ...draft, tts_voice: e.target.value })}

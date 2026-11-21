@@ -50,7 +50,7 @@ const DEFAULT_CLIENT_CONFIG: AppConfig = {
     'Tum ZARA ho — real-life best friend. Roman Urdu mein seedha, chhota aur dostana baat karo. User ko Boss kaho.',
   language: 'bilingual',
   response_tone: 'casual',
-  tts_voice: 'Zephyr',
+  tts_voice: 'ur-PK-UzmaNeural',
   voice_speed: 1.0,
   voice_volume: 1.0,
   stt_model: 'base',
