@@ -1412,12 +1412,12 @@ export function HomeView({
               )}
 
               <div className="flex items-center gap-2">
-                <label htmlFor="nova-chat-input" className="sr-only">
+                <label htmlFor="zara-chat-input" className="sr-only">
                   Message {config.assistant_name}
                 </label>
                 <input
                   ref={inputRef}
-                  id="nova-chat-input"
+                  id="zara-chat-input"
                   type="text"
                   dir="auto"
                   value={inputValue}
