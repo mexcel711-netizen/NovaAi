@@ -2,6 +2,7 @@ import { detectEmotionFromText, extractEmotionAndCleanText, resolveActiveAiProvi
 import { extractMemoriesFromUtterance } from '../src/lib/memoryExtractor';
 import { detectUrduIntent, isComplexThinkingQuery, matchSkillCommand } from '../src/lib/skillMatcher';
 import type { AppConfig, ChatApiResponse, ProviderStatus } from '../src/types/nova';
+import { handleFeatureRoute } from './features';
 
 interface D1Statement { bind(...v:unknown[]):D1Statement; all<T>():Promise<{results:T[]}>; first<T>():Promise<T|null>; run():Promise<unknown>; }
 interface DB { prepare(sql:string):D1Statement; }
@@ -23,6 +24,7 @@ else if(useGemini){model=thinking?'gemini-2.5-pro':'gemini-2.5-flash';provider='
 else return json({error:'Selected AI provider is unavailable. Configure Workers AI or GEMINI_API_KEY, or choose Auto in Settings.'},503);
 if(!raw.trim())throw new Error('AI provider returned an empty response');const parsed=extractEmotionAndCleanText(raw),language=detectUrduIntent(parsed.cleanText)?'ur':lang;await save(db,{sessionId,role:'assistant',content:parsed.cleanText,language,emotion:parsed.emotion,modelUsed:model,providerUsed:provider,thinkingUsed:thinking});return json({reply:parsed.cleanText,emotion:parsed.emotion,language,modelUsed:model,providerUsed:provider,thinkingUsed:thinking,extractedMemories:extracted} satisfies ChatApiResponse);}
 export default {async fetch(request:Request,env:Env){const u=new URL(request.url),p=u.pathname,m=request.method,db=env.DB;if(p==='/api/health')return json({ok:true,runtime:'cloudflare-worker',timestamp:new Date().toISOString(),database:'D1'});try{
+const featureResponse=await handleFeatureRoute(request,env);if(featureResponse)return featureResponse;
 if(p==='/api/state'&&m==='GET')return json(await getState(db,env));
 if(p==='/api/chat'&&m==='POST')return await chat(request,env);
 if(p==='/api/config'&&m==='PUT'){const b=await request.json() as Record<string,unknown>;const allowed=new Set(Object.keys(DEFAULT));for(const [k,v] of Object.entries(b))if(allowed.has(k)&&v!==undefined)await exec(db,'INSERT INTO app_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=CURRENT_TIMESTAMP',k,String(v));const cfg=await getConfig(db);return json({config:cfg,providerStatus:resolveActiveAiProvider({preference:cfg.ai_provider,hasCloudflareBinding:!!env.AI,hasCloudflareRest:false,hasGoogleAiKey:!!env.GEMINI_API_KEY})});}
