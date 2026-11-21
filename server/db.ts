@@ -192,13 +192,13 @@ function seedDefaults() {
     `);
     insertChar.run(
       'nova',
-      'NOVA',
-      'Living Bilingual AI Partner',
-      'Poised Pakistani companion who learns from every conversation, adapts her moods naturally, and manages your tasks.',
+      'ZARA Archive',
+      'Archived Assistant Profile',
+      'Archived original assistant profile retained for continuity; ZARA is the active personal assistant.',
       'friendly_professional',
       'calm',
       'ur-PK-UzmaNeural',
-      'You are NOVA, a poised, warm Pakistani female AI partner fluent in Urdu, Roman Urdu, and English. Grow closer to the user over time and remember their story like a living companion.',
+      'You are ZARA, an archived profile retained for continuity. The current personal assistant identity is ZARA.',
       JSON.stringify(['Bilingual Urdu & English Fluency', 'Adaptive Emotional Awareness']),
       JSON.stringify(['Initialized living memory core ready to learn from every conversation.']),
       1,
@@ -335,7 +335,7 @@ function seedDefaults() {
       'character_switcher',
       'Selectable Character Roster',
       'Switches between living personas ("select Zara", "switch to Ayesha", "Sara se baat karni hai").',
-      ['select zara', 'switch to ayesha', 'select nova', 'select sara'],
+      ['select zara', 'switch to ayesha', 'select legacy assistant', 'select sara'],
       'system',
       'character_engine',
     ],
@@ -374,13 +374,13 @@ function seedDefaults() {
       INSERT INTO memories (category, key, value, source, confidence) VALUES (?, ?, ?, ?, ?)
     `);
     insertMem.run('preference', 'language_mode', 'Prefers bilingual English and Pakistani Urdu responses', 'user_stated', 0.96);
-    insertMem.run('fact', 'workspace_role', 'Building NOVA AI living voice, vision, and laptop workstation', 'ai_inferred', 0.9);
+    insertMem.run('fact', 'workspace_role', 'Building ZARA AI living voice, vision, and laptop workstation', 'ai_inferred', 0.9);
   }
 
   const noteCount = (db.prepare('SELECT COUNT(*) as c FROM notes').get() as { c: number }).c;
   if (noteCount === 0) {
     db.prepare(`INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)`).run(
-      'NOVA Quick Commands',
+      'ZARA Quick Commands',
       'Try: "love mode", "sad mode", "select Zara", "mujhe dekho", "Chrome kholo", or open Study & Code to analyze a book or software!',
       JSON.stringify(['guide', 'bilingual'])
     );
@@ -404,7 +404,7 @@ function seedDefaults() {
     insertConv.run(
       sampleSession,
       'user',
-      'Assalamualaikum Nova, aaj ka schedule aur quick note check karo.',
+      'Assalamualaikum Zara, aaj ka schedule aur quick note check karo.',
       'ur',
       'calm',
       null,
@@ -429,6 +429,24 @@ function seedDefaults() {
 }
 
 seedDefaults();
+
+const activeCharacterSetting = db
+  .prepare("SELECT value FROM app_config WHERE key = 'active_character_id'")
+  .get() as { value: string } | undefined;
+if (activeCharacterSetting && ['1', '2'].includes(activeCharacterSetting.value)) {
+  // Migrate the legacy default selection once; preserve any explicit custom
+  // character choice (IDs other than the original NOVA/ZARA defaults).
+  db.prepare("UPDATE characters SET is_active = 0 WHERE slug = 'nova'").run();
+  db.prepare("UPDATE characters SET is_active = 1 WHERE slug = 'zara'").run();
+  db.prepare(`UPDATE characters SET name = 'ZARA Archive',
+    role_title = 'Archived Assistant Profile',
+    bio = 'Archived original profile retained for continuity; ZARA is the active personal assistant.',
+    system_prompt = 'You are ZARA, an archived profile retained for continuity.'
+    WHERE slug = 'nova'`).run();
+  db.prepare("UPDATE app_config SET value = 'ZARA', updated_at = CURRENT_TIMESTAMP WHERE key = 'assistant_name'").run();
+  db.prepare("UPDATE app_config SET value = 'hey zara', updated_at = CURRENT_TIMESTAMP WHERE key = 'wake_word'").run();
+  db.prepare("UPDATE app_config SET value = '2', updated_at = CURRENT_TIMESTAMP WHERE key = 'active_character_id'").run();
+}
 
 export function getConfig(): AppConfig {
   const rows = db.prepare('SELECT key, value FROM app_config').all() as Array<{ key: string; value: string }>;

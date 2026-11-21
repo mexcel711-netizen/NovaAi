@@ -55,6 +55,7 @@ export function stopAllSpeech(): void {
 
 export interface SpeakResult {
   engine: string;
+  error?: string;
 }
 
 export async function speakText(params: {
@@ -142,9 +143,11 @@ export async function speakText(params: {
   } catch (error) {
     finish();
     if (controller.signal.aborted) return { engine: 'aborted' };
-    // Never switch to another system voice. Chat text stays available while
-    // the same fixed neural speaker can be retried on the next interaction.
-    return { engine: 'voice-unavailable' };
+    // Never switch to another system voice. Surface the failure so the app can
+    // explain why audio did not play while keeping the written reply available.
+    const message = error instanceof Error ? error.message : 'Pakistani Urdu voice playback failed.';
+    console.error('[ZARA voice] Fixed neural voice unavailable:', error);
+    return { engine: 'voice-unavailable', error: message };
   }
 }
 

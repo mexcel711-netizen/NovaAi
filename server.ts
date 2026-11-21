@@ -109,7 +109,7 @@ function buildLocalStructuredStudy(params: {
     params.goal
       ? `Break "${params.goal}" into small testable steps using the core concepts`
       : `Identify the primary workflow or chapter exercise in ${params.title}`,
-    'Ask NOVA in chat about any section or code block for follow-up guidance',
+    'Ask ZARA in chat about any section or code block for follow-up guidance',
     'Run the character Self-Develop action to turn this knowledge into active AI traits',
   ];
 
@@ -890,11 +890,11 @@ async function startServer() {
     const agentPath = path.resolve(process.cwd(), 'desktop-companion/agent.mjs');
     const agentSource = fs.existsSync(agentPath)
       ? fs.readFileSync(agentPath, 'utf8')
-      : 'console.log("NOVA Desktop Companion missing");';
+      : 'console.log("ZARA Desktop Companion missing");';
 
     if (osParam === 'agent') {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="nova-agent.mjs"');
+      res.setHeader('Content-Disposition', 'attachment; filename="zara-agent.mjs"');
       res.send(agentSource);
       return;
     }
@@ -908,12 +908,12 @@ async function startServer() {
         'cat << \'EOF\' > "$HOME/.nova-desktop/agent.mjs"',
         agentSource,
         'EOF',
-        'echo "NOVA Desktop Companion installed in $HOME/.nova-desktop/agent.mjs"',
-        `echo "Open NOVA in your browser (${origin}) and paste the pairing token printed below."`,
+        'echo "ZARA Desktop Companion installed in $HOME/.nova-desktop/agent.mjs"',
+        `echo "Open ZARA in your browser (${origin}) and paste the pairing token printed below."`,
         'node "$HOME/.nova-desktop/agent.mjs"',
       ].join('\n');
       res.setHeader('Content-Type', 'text/x-shellscript; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="nova-desktop-setup.sh"');
+      res.setHeader('Content-Disposition', 'attachment; filename="zara-desktop-setup.sh"');
       res.send(sh);
       return;
     }
@@ -927,7 +927,7 @@ async function startServer() {
       `powershell -NoProfile -Command "[IO.File]::WriteAllBytes('%NOVA_DIR%\\agent.mjs',[Convert]::FromBase64String('${encodedAgent}'))"`,
       'echo.',
       'echo ===================================================',
-      'echo   NOVA AI Laptop Companion Installed Successfully!',
+      'echo   ZARA AI Laptop Companion Installed Successfully!',
       `echo   Web App URL: ${origin}`,
       'echo   Copy the pairing token below into Settings ^> Laptop',
       'echo ===================================================',
@@ -936,7 +936,7 @@ async function startServer() {
       'pause',
     ].join('\r\n');
     res.setHeader('Content-Type', 'application/bat; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="NOVA-Desktop-Setup.bat"');
+    res.setHeader('Content-Disposition', 'attachment; filename="ZARA-Desktop-Setup.bat"');
     res.send(bat);
   });
 
@@ -1124,11 +1124,11 @@ async function startServer() {
   }
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`NOVA AI server listening on http://0.0.0.0:${PORT}`);
+    console.log(`ZARA AI server listening on http://0.0.0.0:${PORT}`);
   });
 }
 
 startServer().catch((err) => {
-  console.error('Failed to start NOVA AI server:', err);
+  console.error('Failed to start ZARA AI server:', err);
   process.exit(1);
 });

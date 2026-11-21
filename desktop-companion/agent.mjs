@@ -233,8 +233,8 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log('\nNOVA Desktop Companion');
+  console.log('\nZARA Desktop Companion');
   console.log(`Listening only on http://${HOST}:${PORT}`);
   console.log(`Pairing token: ${TOKEN}`);
-  console.log('Enter this token in NOVA > Desktop Bridge or Settings > Laptop & Installer.\n');
+  console.log('Enter this token in ZARA > Desktop Bridge or Settings > Laptop & Installer.\n');
 });

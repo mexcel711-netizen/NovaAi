@@ -19,6 +19,7 @@ import {
   speakText,
   startBrowserRecognition,
   stopAllSpeech,
+  unlockAudioContext,
   type SpeechRecognitionHandle,
 } from './lib/voiceService';
 import type {
@@ -61,7 +62,7 @@ const DEFAULT_CLIENT_CONFIG: AppConfig = {
   default_model: 'gemini-4-hydrogen',
   ai_provider: 'auto',
   active_mood: 'auto',
-  active_character_id: 1,
+  active_character_id: 2,
   hands_free_mode: false,
   camera_awareness_enabled: false,
   hairstyle: 'wavy',
@@ -210,6 +211,21 @@ export default function App() {
     fetchState();
   }, [fetchState]);
 
+  // Prime Web Audio while the browser still considers the user's first
+  // pointer, touch, or keyboard action a trusted gesture. TTS completes after
+  // a network request, so unlocking only when playback starts is too late.
+  useEffect(() => {
+    const unlock = () => unlockAudioContext();
+    window.addEventListener('pointerdown', unlock, true);
+    window.addEventListener('touchstart', unlock, { capture: true, passive: true });
+    window.addEventListener('keydown', unlock, true);
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true);
+      window.removeEventListener('touchstart', unlock, true);
+      window.removeEventListener('keydown', unlock, true);
+    };
+  }, []);
+
   const stopMicMeter = useCallback(() => {
     if (micRafRef.current) {
       cancelAnimationFrame(micRafRef.current);
@@ -295,7 +311,7 @@ export default function App() {
     async (text: string, language: 'en' | 'ur', emotion: FacialEmotion) => {
       terminatedRef.current = false;
       setAvatarEmotion(emotion);
-      await speakText({
+      const result = await speakText({
         text,
         voiceName: config.tts_voice,
         language,
@@ -313,6 +329,11 @@ export default function App() {
           setAvatarState('idle');
         },
       });
+      if (result.engine === 'voice-unavailable') {
+        setWarningBanner(`ZARA ki awaaz play nahin ho saki: ${result.error || 'Voice service unavailable.'}`);
+      } else if (result.engine !== 'aborted') {
+        setWarningBanner(null);
+      }
     },
     [config.tts_voice, config.voice_speed, config.voice_volume]
   );
@@ -850,7 +871,7 @@ export default function App() {
           setAvatarState('idle');
           return;
         }
-        const message = err instanceof Error ? err.message : 'Unable to reach NOVA backend.';
+        const message = err instanceof Error ? err.message : 'Unable to reach ZARA backend.';
         setErrorBanner(message);
         setAvatarEmotion('sad');
         setAvatarState('error');
