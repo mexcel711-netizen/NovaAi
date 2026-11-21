@@ -41,8 +41,8 @@ function speechConfigMessage(): string {
   return [
     'Content-Type: application/json; charset=utf-8',
     'Path: speech.config',
+    `X-Timestamp: ${new Date().toUTCString()}`,
     '',
-    `X-Timestamp:${new Date().toUTCString()}`,
     JSON.stringify({
       context: {
         synthesis: {
