@@ -8,7 +8,8 @@ export const NOVA_VOICE = 'ur-PK-UzmaNeural';
 const OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3';
 const EDGE_URL = 'wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1';
 
-type UpgradeResponse = Response & { webSocket?: WebSocket };
+type EdgeWorkerWebSocket = WebSocket & { accept(): void };
+type UpgradeResponse = Response & { webSocket?: EdgeWorkerWebSocket };
 
 function escapeXml(text: string): string {
   return text.replace(/[<>&"']/g, (character) => ({
