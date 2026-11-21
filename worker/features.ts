@@ -865,7 +865,6 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
     await exec(db, 'DELETE FROM reminders WHERE id=?', Number(reminderRoute[1]));
     return json({ ok: true, reminders: await getReminders(db) });
   }
-  const skillRoute = path.match(/^\/api\/skills\/(\d+)$/);
   if (skillRoute && method === 'DELETE') {
     await exec(db, 'DELETE FROM skills_config WHERE id=? AND is_custom=1', Number(skillRoute[1]));
     return json({ ok: true, skills: await getSkills(db) });
