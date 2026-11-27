@@ -146,7 +146,8 @@ export default function App() {
 
   const [wakeWordActive, setWakeWordActive] = useState(false);
   const [autoWatchCamera, setAutoWatchCamera] = useState(false);
-  const [requestedHubTab, setRequestedHubTab] = useState<'visual' | 'study' | 'skills' | 'voice' | null>(null);
+  const [requestedHubTab, setRequestedHubTab] = useState<'visual' | 'study' | 'skills' | 'voice' | 'youtube' | null>(null);
+  const [requestedYouTubeSearch, setRequestedYouTubeSearch] = useState<{ query: string; id: number } | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [warningBanner, setWarningBanner] = useState<string | null>(null);
   const [launchedUrl, setLaunchedUrl] = useState<string | null>(null);
@@ -850,6 +851,9 @@ export default function App() {
           setLaunchedUrl(data.sideEffect.url);
         } else if (data.sideEffect?.type === 'open_study') {
           setRequestedHubTab('study');
+        } else if (data.sideEffect?.type === 'youtube_search' && data.sideEffect.youtubeQuery) {
+          setRequestedYouTubeSearch({ query: data.sideEffect.youtubeQuery, id: Date.now() });
+          setRequestedHubTab('youtube');
         } else if (data.sideEffect?.type === 'trigger_vision') {
           void handleCaptureVision(text);
         } else if (data.sideEffect?.type === 'trigger_evolve') {
@@ -1256,6 +1260,7 @@ export default function App() {
               autoWatchCamera={autoWatchCamera}
               camera={camera}
               requestedHubTab={requestedHubTab}
+              requestedYouTubeSearch={requestedYouTubeSearch}
               errorBanner={errorBanner}
               warningBanner={warningBanner}
               onNavigate={setActivePage}
