@@ -94,7 +94,8 @@ function Add-ZaraAppShortcut([string]$shortcutPath) {
     $link.Save()
   } else {
     $urlPath = [IO.Path]::ChangeExtension($shortcutPath, '.url')
-    "[InternetShortcut]`r`nURL=$appUrl" | Set-Content -LiteralPath $urlPath -Encoding ASCII
+    $urlContent = "[InternetShortcut]" + [Environment]::NewLine + "URL=$appUrl"
+    Set-Content -LiteralPath $urlPath -Value $urlContent -Encoding ASCII
   }
 }
 
