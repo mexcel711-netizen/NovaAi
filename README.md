@@ -26,8 +26,21 @@ bun run deploy
 `bun run db:migrate` targets the configured remote D1 database `nova-ai-production`; only run it while authenticated to the intended Cloudflare account. GitHub Actions validates migration SQL against an in-memory SQLite database, then runs type checks, tests and the production build. It does not change the live D1 database.
 
 ## Local development
-- Copy `.env.example` to `.env` and add `GEMINI_API_KEY` if you want to use Gemini locally.
-- Run `bun install` then `bun run dev`.
+- Copy .env.example to .env; add GEMINI_API_KEY for Google AI Studio and YOUTUBE_API_KEY for YouTube search.
+- Run bun install then bun run dev.
+
+## YouTube Data API integration
+The Home screen's **YouTube** hub tab searches public videos through the YouTube Data API v3 and embeds the selected result. Voice commands such as "YouTube search for Python tutorials", "youtube par Python tutorials search karo", or "یوٹیوب پر Python tutorials تلاش کرو" open the same in-app search panel.
+
+### Create and configure the YouTube API key
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and select or create a project.
+2. In **APIs & Services → Library**, find **YouTube Data API v3** and enable it.
+3. In **APIs & Services → Credentials**, create an API key. Restrict the key to **YouTube Data API v3** and keep it private.
+4. For local development, put the key in your uncommitted .env file as YOUTUBE_API_KEY=your-key.
+5. For the deployed Worker, run **bunx wrangler secret put YOUTUBE_API_KEY** from the repository root and enter the key in Wrangler's prompt. This secret is not stored in Git. Setting a Worker secret publishes a new deployment.
+6. Gemini is already implemented. Set GEMINI_API_KEY locally for Express, or run **bunx wrangler secret put GEMINI_API_KEY** for the deployed Worker when you are ready to enable Google AI Studio.
+
+The API key is read only by the server/Worker. The browser calls the same-origin /api/youtube/search endpoint and never receives the key.
 - The local Express server uses Node SQLite; production uses Cloudflare D1.
 
 ## Security and privacy
