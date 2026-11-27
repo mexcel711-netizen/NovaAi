@@ -372,6 +372,21 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [stateLoaded, isAutostart, config.auto_speak, config.user_nickname, config.assistant_name, speakWithLipSync]);
 
+  // Give the installed desktop app its spoken welcome after preferences load.
+  // Voice playback may still depend on the user's browser autoplay policy.
+  useEffect(() => {
+    if (!stateLoaded || !isAutostart || !config.auto_speak || startupGreetingRef.current) return;
+    startupGreetingRef.current = true;
+    const timer = window.setTimeout(() => {
+      void speakWithLipSync(
+        `Hello ${config.user_nickname || 'Boss'}! Main ${config.assistant_name || 'ZARA'} hoon. Aapka laptop ready hai. Bataiye, aaj kya karna hai?`,
+        'ur',
+        'happy'
+      );
+    }, 1100);
+    return () => window.clearTimeout(timer);
+  }, [stateLoaded, isAutostart, config.auto_speak, config.user_nickname, config.assistant_name, speakWithLipSync]);
+
   // Spoken proactive reminder alerts when due
   useEffect(() => {
     const timer = window.setInterval(() => {
