@@ -166,7 +166,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   user_name: 'Boss',
   user_nickname: 'Boss',
   assistant_age: '21',
-  onboarding_completed: false,
+  onboarding_completed: true,
   whatsapp_number: '',
   referral_source: '',
   auto_usb_transfer: false,

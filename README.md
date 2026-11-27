@@ -52,12 +52,19 @@ The API key is read only by the server/Worker. The browser calls the same-origin
 ## ZARA AI holographic command centre and desktop companion
 The Home screen includes a holographic command-centre layout and an optional local Desktop Bridge panel.
 
-### Windows desktop actions
-1. Start the local companion from the repository root: `bun run desktop:companion`.
-2. Copy the one-time pairing token printed in the terminal into ZARA's **Desktop Bridge** panel and press **Pair**.
-3. Use the panel buttons or say/type commands such as `Chrome kholo`, `Edge kholo`, `Notepad kholo`, or `Calculator kholo`.
+### Windows desktop install and automatic startup
+1. Open Settings → Laptop & Installer and download Windows Installer (.bat).
+2. Run the installer on the Windows laptop. It installs the companion under the current user's Local AppData folder and creates a ZARA AI desktop shortcut.
+3. When asked, choose whether ZARA and its companion should start automatically when that Windows user signs in. The installer generates a private pairing token for this PC, so the browser does not need a manual token copy.
+4. The desktop shortcut opens ZARA in its app window. The startup URL carries the local pairing token only in its URL fragment; the app stores it in local browser storage and removes the fragment from the address bar.
+5. With ?autostart=1, ZARA greets the saved nickname with a spoken "Hello Boss" welcome. Automatic audio still depends on the installed browser's playback and permission settings.
 
-The companion is an optional local Node.js process. It binds to loopback only, checks the ZARA origin and pairing token, and only launches the small allowlist of applications. See [desktop-companion/README.md](desktop-companion/README.md) for setup and security details.
+The Windows installer requires Node.js 18+ and Microsoft Edge for the preferred app-window experience (the system's default browser is used if Edge is not found). The local companion binds to loopback only, checks the ZARA origin and a random per-install pairing token, and exposes only explicit app-launch, known-folder, file-list/read, and system-information actions. It does not expose arbitrary shell or administrator access.
+
+For manual development, start the companion from the repository root with bun run desktop:companion, then paste the one-time token into the Desktop Bridge panel. See desktop-companion/README.md for details.
+
+### Login and access boundary
+The in-app first-run setup wizard has been removed; the assistant opens directly into its workspace. The production deployment's Cloudflare Access identity gate is separate from this repository's UI and remains enabled. Keep it restricted to trusted identities: removing that external gate would expose the single-user assistant's chat history, memories, notes, and reminders to anyone who can reach the deployment.
 
 ### Pakistani Urdu neural female voice
 ZARA uses one fixed Microsoft Edge neural speaker, `ur-PK-UzmaNeural`, for Urdu, Roman Urdu and English. Character, mood, language and device settings do not switch the speaker. The local Node server and Cloudflare Worker use the same Sec-MS-GEC v2 Read Aloud handshake. Browser SpeechSynthesis and the old Google Translate TTS fallback are disabled so a provider failure never silently changes the voice. If synthesis is temporarily unavailable, the written reply remains visible and ZARA retries the same fixed voice once. The app unlocks Web Audio on the first user gesture so delayed TTS responses can play under browser autoplay policies.

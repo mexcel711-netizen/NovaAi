@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, FolderOpen, Link2, Monitor, Play, Terminal, Unplug, Usb } from 'lucide-react';
 
 import {
@@ -19,17 +19,19 @@ export function DesktopBridgePanel() {
   const [message, setMessage] = useState('');
   const [fileListing, setFileListing] = useState<string[]>([]);
 
-  const connect = async () => {
+  const connect = async (candidateToken = token) => {
+    const cleanToken = candidateToken.trim();
+    if (!cleanToken) return;
     setBusy(true);
     setMessage('');
     try {
       const response = await fetch('http://127.0.0.1:3210/v1/health', {
-        headers: { Authorization: `Bearer ${token.trim()}` },
+        headers: { Authorization: `Bearer ${cleanToken}` },
       });
       const data = (await response.json()) as { error?: string; capabilities?: string[] };
       if (!response.ok) throw new Error(data.error || 'Companion not reachable');
-      localStorage.setItem(TOKEN_KEY, token.trim());
-      setToken(token.trim());
+      localStorage.setItem(TOKEN_KEY, cleanToken);
+      setToken(cleanToken);
       setStatus('connected');
       setMessage(`Connected · ${(data.capabilities || []).length} capabilities`);
     } catch (error) {
@@ -39,6 +41,16 @@ export function DesktopBridgePanel() {
       setBusy(false);
     }
   };
+
+  // Installer-created tokens are stored locally; reconnect without asking for a
+  // second manual pairing every time Settings is opened.
+  useEffect(() => {
+    const savedToken = getDesktopBridgeToken();
+    if (savedToken) {
+      setToken(savedToken);
+      void connect(savedToken);
+    }
+  }, []);
 
   const newTab = async () => {
     setBusy(true);
@@ -272,7 +284,7 @@ export function DesktopBridgePanel() {
         </ul>
       )}
       <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
-        Install the local companion from Settings &rarr; Laptop &amp; Installer so anyone can run NOVA on Windows, macOS, or Linux.
+        The Windows installer can pair this browser automatically. Manual token pairing remains available for development and recovery.
       </p>
     </section>
   );

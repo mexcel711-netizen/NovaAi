@@ -5,6 +5,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
 import { searchYouTubeVideos, YouTubeApiError } from './src/lib/youtube';
+import { buildWindowsDesktopInstaller } from './src/lib/desktopInstaller';
 import { generateCloudflareRestReply } from './server/cloudflare';
 import {
   addKnowledgeSource,
@@ -1021,7 +1022,12 @@ async function startServer() {
       return;
     }
 
-    const origin = `${req.protocol}://${req.get('host')}`;
+    const requestHost = req.get('host') || '';
+    if (!/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(requestHost)) {
+      res.status(400).send('Invalid installer host.');
+      return;
+    }
+    const origin = new URL(`${req.protocol}://${requestHost}`).origin;
     if (osParam === 'unix' || osParam === 'mac' || osParam === 'linux') {
       const sh = [
         '#!/usr/bin/env bash',
@@ -1033,33 +1039,22 @@ async function startServer() {
         'echo "ZARA Desktop Companion installed in $HOME/.nova-desktop/agent.mjs"',
         `echo "Open ZARA in your browser (${origin}) and paste the pairing token printed below."`,
         'node "$HOME/.nova-desktop/agent.mjs"',
-      ].join('\n');
+      ].join('\\n');
       res.setHeader('Content-Type', 'text/x-shellscript; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="zara-desktop-setup.sh"');
       res.send(sh);
       return;
     }
 
-    const encodedAgent = Buffer.from(agentSource, 'utf8').toString('base64');
-    const bat = [
-      '@echo off',
-      'setlocal',
-      'set NOVA_DIR=%USERPROFILE%\\.nova-desktop',
-      'if not exist "%NOVA_DIR%" mkdir "%NOVA_DIR%"',
-      `powershell -NoProfile -Command "[IO.File]::WriteAllBytes('%NOVA_DIR%\\agent.mjs',[Convert]::FromBase64String('${encodedAgent}'))"`,
-      'echo.',
-      'echo ===================================================',
-      'echo   ZARA AI Laptop Companion Installed Successfully!',
-      `echo   Web App URL: ${origin}`,
-      'echo   Copy the pairing token below into Settings ^> Laptop',
-      'echo ===================================================',
-      'echo.',
-      'node "%NOVA_DIR%\\agent.mjs"',
-      'pause',
-    ].join('\r\n');
-    res.setHeader('Content-Type', 'application/bat; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="ZARA-Desktop-Setup.bat"');
-    res.send(bat);
+    try {
+      const bat = buildWindowsDesktopInstaller(agentSource, origin);
+      res.setHeader('Content-Type', 'application/bat; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="ZARA-Desktop-Setup.bat"');
+      res.send(bat);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to build desktop installer.';
+      res.status(400).send(message);
+    }
   });
 
   app.get('/api/youtube/search', async (req, res) => {

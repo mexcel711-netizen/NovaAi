@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Download, Mic, Play, RotateCcw, Share2, Square, Trash2 } from 'lucide-react';
+import { Check, Copy, Download, Mic, Play, Share2, Square, Trash2 } from 'lucide-react';
 import { speakText, stopAllSpeech } from '../../lib/voiceService';
 import type { AiProviderPreference, AppConfig, HairstyleOption, ProviderStatus } from '../../types/nova';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -12,7 +12,6 @@ interface SettingsViewProps {
   memoryCount: number;
   onSaveConfig: (partial: Partial<AppConfig>) => Promise<void>;
   onClearAllMemories: () => Promise<void>;
-  onReplayOnboarding?: () => Promise<void>;
 }
 
 type SettingsTab = 'ai' | 'voice' | 'mic' | 'laptop' | 'privacy';
@@ -27,7 +26,6 @@ export function SettingsView({
   memoryCount,
   onSaveConfig,
   onClearAllMemories,
-  onReplayOnboarding,
 }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
   const [draft, setDraft] = useState<AppConfig>(config);
@@ -577,10 +575,10 @@ export function SettingsView({
 
               <div className="mt-4 border-t border-slate-800/80 pt-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  1-Click Laptop Companion Installers (Full Local OS Control)
+                  Windows Desktop Installer &amp; Startup
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  Download and run the installer on any Windows, macOS, or Linux laptop (requires Node.js 18+) to unlock VS Code, Terminal, Chrome tabs, Downloads/Desktop folder access, and local speech.
+                  On Windows, run the installer to create a ZARA desktop shortcut and optionally start ZARA automatically when you sign in. It also starts the secure local companion for app launching, approved user-folder access, and system information (Node.js 18+ required).
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2.5">
                   <a
@@ -617,24 +615,6 @@ export function SettingsView({
 
         {activeTab === 'privacy' && (
           <div className="space-y-5 rounded-xl border border-slate-800 bg-[#0D1117] p-5">
-            {onReplayOnboarding && (
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
-                <div>
-                  <h2 className="text-sm font-semibold text-white">Intro &amp; Voice Setup Flow</h2>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Replay the talking step-by-step setup to change hairstyle, name, age, or relationship mode.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void onReplayOnboarding()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-medium text-cyan-200 transition-colors hover:bg-cyan-500/20 whitespace-nowrap shrink-0"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Replay Intro &amp; Setup</span>
-                </button>
-              </div>
-            )}
 
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>

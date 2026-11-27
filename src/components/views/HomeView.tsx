@@ -395,11 +395,11 @@ export function HomeView({
   };
 
   return (
-    <div className="grid h-full content-start gap-3.5 overflow-y-auto bg-transparent p-3.5 grid-cols-1 lg:min-h-0 lg:content-stretch lg:grid-cols-[252px_minmax(0,1fr)_344px] xl:grid-cols-[276px_minmax(0,1fr)_384px] lg:overflow-hidden">
+    <div className="grid h-full content-start gap-3.5 overflow-y-auto bg-transparent p-3.5 grid-cols-1 lg:min-h-0 lg:content-stretch lg:grid-cols-[344px_minmax(0,1fr)_252px] xl:grid-cols-[384px_minmax(0,1fr)_276px] lg:overflow-hidden">
       {/* FAR LEFT COLUMN: Living Character Bond + Camera Awareness + AI Topology + Stored Intelligence */}
       <aside
         aria-label="Core context and live intelligence"
-        className="order-2 flex flex-col gap-3 lg:order-1 lg:min-h-0 lg:overflow-y-auto lg:pr-0.5"
+        className="order-3 flex flex-col gap-3 lg:order-3 lg:min-h-0 lg:overflow-y-auto lg:pr-0.5"
       >
         {/* Top Living Character & Live Feed Card */}
         <div className="rounded-2xl border border-white/[0.08] bg-[#080E1A] p-3.5">
@@ -721,7 +721,7 @@ export function HomeView({
                 emotion={avatarEmotion}
                 assistantName={config.assistant_name}
                 hairstyle={config.hairstyle}
-                variant="stage"
+                variant="hero"
                 micLevel={micLevel}
                 lipOpenness={lipOpenness}
                 lipWidth={lipWidth}
@@ -1303,7 +1303,7 @@ export function HomeView({
       {/* FAR RIGHT COLUMN: Segmented Chat | Notes | Reminders Panel */}
       <section
         aria-label="Assistant transcript and workspace"
-        className="order-3 flex min-h-[440px] flex-col rounded-2xl border border-white/[0.08] bg-[#080E1A] lg:order-3 lg:min-h-0"
+        className="order-2 flex min-h-[440px] flex-col rounded-2xl border border-white/[0.08] bg-[#080E1A] lg:order-1 lg:min-h-0"
       >
         <div className="flex items-center justify-between gap-2 border-b border-white/[0.07] px-3.5 py-2.5">
           <div

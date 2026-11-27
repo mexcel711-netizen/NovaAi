@@ -1,4 +1,5 @@
 import { searchYouTubeVideos, YouTubeApiError } from '../src/lib/youtube';
+import { buildWindowsDesktopInstaller } from '../src/lib/desktopInstaller';
 import { computeEvolutionProgress } from '../src/lib/characterEngine';
 import { detectEmotionFromText, extractEmotionAndCleanText } from '../src/lib/emotionAndSpeech';
 import { detectUrduIntent } from '../src/lib/skillMatcher';
@@ -60,7 +61,7 @@ const DEFAULT_CONFIG: AppConfig = {
   user_name: 'Boss',
   user_nickname: 'Boss',
   assistant_age: '21',
-  onboarding_completed: false,
+  onboarding_completed: true,
   whatsapp_number: '',
   referral_source: '',
   auto_usb_transfer: false,
@@ -205,7 +206,7 @@ async function readConfig(db: D1Database): Promise<AppConfig> {
     user_name: get('user_name', 'Boss'),
     user_nickname: get('user_nickname', 'Boss'),
     assistant_age: get('assistant_age', '21'),
-    onboarding_completed: get('onboarding_completed', 'false') === 'true',
+    onboarding_completed: get('onboarding_completed', 'true') === 'true',
     whatsapp_number: get('whatsapp_number', ''),
     referral_source: get('referral_source', ''),
     auto_usb_transfer: get('auto_usb_transfer', 'false') === 'true',
@@ -722,32 +723,16 @@ async function handleDesktopInstaller(request: Request, env: FeatureEnv): Promis
     });
   }
 
-  const bytes = new TextEncoder().encode(agentSource);
-  let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  let batch: string;
+  try {
+    batch = buildWindowsDesktopInstaller(agentSource, origin);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : 'Unable to build desktop installer.' }, 400);
   }
-  const encodedAgent = btoa(binary);
-  const batch = [
-    '@echo off',
-    'setlocal',
-    'set NOVA_DIR=%USERPROFILE%\\.nova-desktop',
-    'if not exist "%NOVA_DIR%" mkdir "%NOVA_DIR%"',
-    `powershell -NoProfile -Command "[IO.File]::WriteAllBytes('%NOVA_DIR%\\agent.mjs',[Convert]::FromBase64String('${encodedAgent}'))"`,
-    'echo.',
-    'echo ===================================================',
-    'echo   NOVA AI Laptop Companion Installed Successfully!',
-    `echo   Web App URL: ${origin}`,
-    'echo   Copy the pairing token below into Settings ^> Laptop',
-    'echo ===================================================',
-    'echo.',
-    'node "%NOVA_DIR%\\agent.mjs"',
-    'pause',
-  ].join('\r\n');
   return new Response(batch, {
     headers: {
       'Content-Type': 'application/bat; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="NOVA-Desktop-Setup.bat"',
+      'Content-Disposition': 'attachment; filename="ZARA-Desktop-Setup.bat"',
       'Cache-Control': 'no-store',
     },
   });

@@ -4,7 +4,6 @@ import {
   MessageSquarePlus,
   X,
 } from 'lucide-react';
-import { OnboardingFlow } from './components/OnboardingFlow';
 import { OfflineIndicator, PWAInstallButton } from './components/PWAInstallButton';
 import { CharacterView } from './components/views/CharacterView';
 import { HomeView, type ChatAttachmentDraft } from './components/views/HomeView';
@@ -13,6 +12,7 @@ import { RecentView } from './components/views/RecentView';
 import { SettingsView } from './components/views/SettingsView';
 import { SkillsView } from './components/views/SkillsView';
 import { executeDesktopCommand } from './lib/desktopIntent';
+import { TOKEN_KEY } from './lib/desktopBridge';
 import { linkUsbDirectoryHandle, performUsbMemoryTransfer } from './lib/usbTransfer';
 import { useCameraAwareness } from './lib/useCameraAwareness';
 import {
@@ -35,7 +35,6 @@ import type {
   MemoryRecord,
   MoodMode,
   NoteRecord,
-  OnboardingPayload,
   ProviderStatus,
   ReminderRecord,
   ResponseStyle,
@@ -75,7 +74,7 @@ const DEFAULT_CLIENT_CONFIG: AppConfig = {
   auto_usb_transfer: false,
   last_usb_sync_at: '',
   last_usb_drive_label: '',
-  onboarding_completed: false,
+  onboarding_completed: true,
 };
 
 const DEFAULT_PROVIDER_STATUS: ProviderStatus = {
@@ -104,7 +103,7 @@ function createGreetingMessage(
     id: `greeting-${sessionId}`,
     sessionId,
     role: 'assistant',
-    content: `Arre ${nick}! Kya chal raha hai? Batao!`,
+    content: `Hello ${nick}! Main ${_assistantName} hoon. Aapka AI assistant ready hai. Bataiye, kya karna hai?`,
     emotion: 'happy',
     language: 'ur',
     timestamp: new Date().toISOString(),
@@ -115,7 +114,6 @@ export default function App() {
   const [activePage, setActivePage] = useState<SidebarPage>('home');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [stateLoaded, setStateLoaded] = useState(false);
-  const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
   const isAutostart =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('autostart') === '1';
@@ -160,6 +158,21 @@ export default function App() {
   const micRafRef = useRef<number>(0);
   const terminatedRef = useRef<boolean>(false);
   const spokenRemindersRef = useRef<Set<number>>(new Set());
+  const startupGreetingRef = useRef(false);
+
+  // The Windows installer carries the local bridge token in the URL fragment.
+  // Fragments are not sent to the server; save the token locally and scrub the URL.
+  useEffect(() => {
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const startupToken = fragment.get('zara-bridge');
+    if (!startupToken) return;
+    try {
+      window.localStorage.setItem(TOKEN_KEY, startupToken);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    } catch {
+      // Local storage may be disabled; the user can still pair from Settings.
+    }
+  }, []);
 
   const activeCharacter =
     characters.find((c) => c.is_active) ||
@@ -342,6 +355,22 @@ export default function App() {
     },
     [config.tts_voice, config.voice_speed, config.voice_volume]
   );
+
+
+  // Give the installed desktop app its spoken welcome after preferences load.
+  // Voice playback may still depend on the user's browser autoplay policy.
+  useEffect(() => {
+    if (!stateLoaded || !isAutostart || !config.auto_speak || startupGreetingRef.current) return;
+    startupGreetingRef.current = true;
+    const timer = window.setTimeout(() => {
+      void speakWithLipSync(
+        `Hello ${config.user_nickname || 'Boss'}! Main ${config.assistant_name || 'ZARA'} hoon. Aapka laptop ready hai. Bataiye, aaj kya karna hai?`,
+        'ur',
+        'happy'
+      );
+    }, 1100);
+    return () => window.clearTimeout(timer);
+  }, [stateLoaded, isAutostart, config.auto_speak, config.user_nickname, config.assistant_name, speakWithLipSync]);
 
   // Spoken proactive reminder alerts when due
   useEffect(() => {
@@ -639,43 +668,6 @@ export default function App() {
     },
     [isSending, sessionId, config.auto_speak, speakWithLipSync]
   );
-
-  const handleCompleteOnboarding = useCallback(
-    async (payload: OnboardingPayload) => {
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const errData = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(errData.error || 'Failed to activate assistant.');
-      }
-      const data = (await res.json()) as {
-        config: AppConfig;
-        characters: CharacterProfile[];
-        memories: MemoryRecord[];
-      };
-      setConfig(data.config);
-      if (data.characters) setCharacters(data.characters);
-      if (data.memories) setMemories(data.memories);
-      setDismissedOnboarding(true);
-      const nick = data.config.user_nickname || 'Boss';
-      const firstGreeting = createGreetingMessage(sessionId, data.config.assistant_name, nick);
-      setMessages([firstGreeting]);
-      setActivePage('home');
-      if (data.config.auto_speak) {
-        void speakWithLipSync(firstGreeting.content, 'ur', 'happy');
-      }
-    },
-    [sessionId, speakWithLipSync]
-  );
-
-  const handleReplayOnboarding = useCallback(async () => {
-    stopAllSpeech();
-    setDismissedOnboarding(false);
-    await handleSaveConfig({ onboarding_completed: false });
-  }, [handleSaveConfig]);
 
   const visionHandlerRef = useRef<(prompt?: string) => Promise<void>>(async () => {});
   const camera = useCameraAwareness(autoWatchCamera, () => {
@@ -1112,18 +1104,6 @@ export default function App() {
     }
   };
 
-  if (stateLoaded && !config.onboarding_completed && !isAutostart && !dismissedOnboarding) {
-    return (
-      <OnboardingFlow
-        initialUserName={config.user_name}
-        initialAssistantName={config.assistant_name}
-        initialHairstyle={config.hairstyle}
-        onComplete={handleCompleteOnboarding}
-        onSkipToApp={() => setDismissedOnboarding(true)}
-      />
-    );
-  }
-
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#04070D] text-slate-100">
       <OfflineIndicator />
@@ -1442,7 +1422,6 @@ export default function App() {
                   setMemories([]);
                 }
               }}
-              onReplayOnboarding={handleReplayOnboarding}
             />
           )}
         </main>
