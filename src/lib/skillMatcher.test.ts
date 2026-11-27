@@ -90,6 +90,20 @@ test('matchSkillCommand executes bilingual Roman Urdu app launch', () => {
   assert.equal(inlineCalc.responseText, '25 * 14 equals 350.');
 });
 
+test('matchSkillCommand routes YouTube searches to the in-app API panel in English and Urdu', () => {
+  const english = matchSkillCommand('youtube search for Python tutorials', baseSkills);
+  assert.equal(english.matched, true);
+  assert.equal(english.skillName, 'youtube_search');
+  assert.equal(english.sideEffect?.type, 'youtube_search');
+  assert.equal(english.sideEffect?.youtubeQuery, 'Python tutorials');
+
+  const romanUrdu = matchSkillCommand('youtube par AI voice assistant search karo', baseSkills);
+  assert.equal(romanUrdu.sideEffect?.youtubeQuery, 'AI voice assistant');
+
+  const urdu = matchSkillCommand('یوٹیوب پر جاوا اسکرپٹ کورس تلاش کرو', baseSkills);
+  assert.equal(urdu.sideEffect?.youtubeQuery, 'جاوا اسکرپٹ کورس');
+});
+
 test('matchSkillCommand parses notes and reminders accurately', () => {
   const noteRes = matchSkillCommand('create note: Prepare Q4 architecture review', baseSkills);
   assert.equal(noteRes.matched, true);

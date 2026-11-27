@@ -622,6 +622,27 @@ export function matchSkillCommand(
     }
   }
 
+  // Dedicated YouTube Data API search (opens the in-app results panel).
+  if (isEnabled('youtube_search')) {
+    const youtubeMatch =
+      input.match(/^(?:youtube\s+(?:search(?:\s+for)?|for)|search\s+(?:on\s+)?youtube(?:\s+for)?)\s+(.+)$/i) ||
+      input.match(/^youtube\s+par\s+(.+?)\s+(?:search\s+karo|dhundo)$/i) ||
+      input.match(/^یوٹیوب\s+پر\s+(.+?)\s+(?:تلاش\s+کرو|سرچ\s+کرو|ڈھونڈو)$/);
+    if (youtubeMatch && youtubeMatch[1].trim().length > 1) {
+      const query = youtubeMatch[1].trim().slice(0, 120);
+      return {
+        matched: true,
+        skillName: 'youtube_search',
+        actionType: 'system',
+        language: isUrdu ? 'ur' : 'en',
+        responseText: isUrdu
+          ? `YouTube par "${query}" ki videos dhoond rahi hoon.`
+          : `Searching YouTube for "${query}".`,
+        sideEffect: { type: 'youtube_search', youtubeQuery: query },
+      };
+    }
+  }
+
   // 11. Web search skill
   if (isEnabled('web_search')) {
     const searchMatch =

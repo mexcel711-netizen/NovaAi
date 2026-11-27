@@ -205,6 +205,7 @@ export interface SkillExecutionResult {
       | 'trigger_vision'
       | 'trigger_evolve'
       | 'open_study'
+      | 'youtube_search'
       | 'transfer_usb'
       | 'toggle_auto_usb'
       | 'check_usb'
@@ -215,6 +216,7 @@ export interface SkillExecutionResult {
       | 'list_reminders'
       | 'none';
     url?: string;
+    youtubeQuery?: string;
     noteTitle?: string;
     noteContent?: string;
     reminderTitle?: string;
