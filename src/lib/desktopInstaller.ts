@@ -63,16 +63,22 @@ Set shell = CreateObject("WScript.Shell")
 Set env = shell.Environment("PROCESS")
 env("NOVA_BRIDGE_TOKEN") = "$token"
 env("NOVA_ALLOWED_ORIGIN") = "$origin"
-shell.Run """"$nodePath"""" & " " & """"$agentPath"""", 0, False
+shell.Run Chr(34) & "$nodePath" & Chr(34) & " " & Chr(34) & "$agentPath" & Chr(34), 0, False
 "@
 [IO.File]::WriteAllText($vbsPath, $vbs, [Text.UTF8Encoding]::new($false))
 
 $appUrl = $origin + '/?autostart=1#zara-bridge=' + [uri]::EscapeDataString($token)
-$edgeCandidates = @(
-  (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
-  (Join-Path ([Environment]::GetEnvironmentVariable('ProgramFiles(x86)')) 'Microsoft\Edge\Application\msedge.exe'),
-  (Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\Application\msedge.exe')
-)
+$edgeCandidates = @()
+if ($env:ProgramFiles) {
+  $edgeCandidates += Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'
+}
+$programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+if ($programFilesX86) {
+  $edgeCandidates += Join-Path $programFilesX86 'Microsoft\Edge\Application\msedge.exe'
+}
+if ($env:LOCALAPPDATA) {
+  $edgeCandidates += Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\Application\msedge.exe'
+}
 $edge = $edgeCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 $shell = New-Object -ComObject WScript.Shell
 $desktop = [Environment]::GetFolderPath('Desktop')
@@ -117,17 +123,22 @@ Write-Host 'ZARA is installed. The desktop companion uses a private token stored
 `.trim();
 
   const encodedPowerShell = base64Utf16Le(powershell);
+  const chunks = encodedPowerShell.match(/.{1,3500}/g) || [];
   return [
     '@echo off',
-    'setlocal',
+    'setlocal DisableDelayedExpansion',
     'where node.exe >nul 2>nul',
     'if errorlevel 1 (',
     '  echo Node.js 18 or newer is required. Install it from https://nodejs.org/ and run this installer again.',
     '  pause',
     '  exit /b 1',
     ')',
-    'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + encodedPowerShell,
-    'if errorlevel 1 (',
+    'set "PAYLOAD=%TEMP%\\zara-install-%RANDOM%-%RANDOM%.b64"',
+    ...chunks.map((chunk, index) => `${index === 0 ? '>' : '>>'} "%PAYLOAD%" echo ${chunk}`),
+    'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$b64=(Get-Content -Raw -LiteralPath \'%PAYLOAD%\').Trim(); $src=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64)); & ([ScriptBlock]::Create($src))"',
+    'set "INSTALL_RESULT=%ERRORLEVEL%"',
+    'del "%PAYLOAD%" >nul 2>nul',
+    'if not "%INSTALL_RESULT%"=="0" (',
     '  echo ZARA installation failed. Check the PowerShell message above.',
     '  pause',
     '  exit /b 1',
