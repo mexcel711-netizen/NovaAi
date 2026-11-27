@@ -74,7 +74,7 @@ const DEFAULT_CLIENT_CONFIG: AppConfig = {
   auto_usb_transfer: false,
   last_usb_sync_at: '',
   last_usb_drive_label: '',
-  onboarding_completed: false,
+  onboarding_completed: true,
 };
 
 const DEFAULT_PROVIDER_STATUS: ProviderStatus = {
@@ -356,21 +356,6 @@ export default function App() {
     [config.tts_voice, config.voice_speed, config.voice_volume]
   );
 
-
-  // A Windows startup shortcut opens the app with ?autostart=1. Speak once
-  // after state hydration so the greeting uses the saved voice and settings.
-  useEffect(() => {
-    if (!stateLoaded || !isAutostart || !config.auto_speak || startupGreetingRef.current) return;
-    startupGreetingRef.current = true;
-    const timer = window.setTimeout(() => {
-      void speakWithLipSync(
-        `Hello ${config.user_nickname || 'Boss'}! Main ${config.assistant_name || 'ZARA'} hoon. Aapka laptop ready hai. Bataiye, aaj kya karna hai?`,
-        'ur',
-        'happy'
-      );
-    }, 1100);
-    return () => window.clearTimeout(timer);
-  }, [stateLoaded, isAutostart, config.auto_speak, config.user_nickname, config.assistant_name, speakWithLipSync]);
 
   // Give the installed desktop app its spoken welcome after preferences load.
   // Voice playback may still depend on the user's browser autoplay policy.
