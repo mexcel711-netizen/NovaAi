@@ -55,6 +55,7 @@ import type {
   SkillConfig,
 } from '../../types/nova';
 import { HolographicAvatar } from '../HolographicAvatar';
+import { YouTubePanel } from '../YouTubePanel';
 
 export interface ChatAttachmentDraft {
   title: string;
@@ -85,7 +86,8 @@ interface HomeViewProps {
   handsFreeMode: boolean;
   autoWatchCamera: boolean;
   camera: CameraAwarenessState;
-  requestedHubTab?: 'visual' | 'study' | 'skills' | 'voice' | null;
+  requestedHubTab?: 'visual' | 'study' | 'skills' | 'voice' | 'youtube' | null;
+  requestedYouTubeSearch?: { query: string; id: number } | null;
   errorBanner: string | null;
   warningBanner: string | null;
   pendingVoiceReplay?: boolean;
@@ -123,7 +125,7 @@ interface HomeViewProps {
   onDeleteReminder: (id: number) => Promise<void>;
 }
 
-type CenterHubTab = 'visual' | 'study' | 'skills' | 'voice';
+type CenterHubTab = 'visual' | 'study' | 'skills' | 'voice' | 'youtube';
 type RightPanelTab = 'chat' | 'notes' | 'reminders';
 
 const QUICK_VISUAL_PROMPTS = [
@@ -176,6 +178,7 @@ export function HomeView({
   autoWatchCamera,
   camera,
   requestedHubTab,
+  requestedYouTubeSearch,
   errorBanner,
   warningBanner,
   pendingVoiceReplay = false,
@@ -876,6 +879,7 @@ export function HomeView({
                   { id: 'study', label: 'Study & Code' },
                   { id: 'skills', label: 'Quick Skills' },
                   { id: 'voice', label: 'Voice Tuning' },
+                  { id: 'youtube', label: 'YouTube' },
                 ] as const
               ).map((tab) => (
                 <button
@@ -895,6 +899,12 @@ export function HomeView({
               ))}
             </div>
           </div>
+
+          {centerTab === 'youtube' && (
+            <div className="mt-3">
+              <YouTubePanel requestedSearch={requestedYouTubeSearch} />
+            </div>
+          )}
 
           {/* Tab 1: Visual Hub */}
           {centerTab === 'visual' && (
