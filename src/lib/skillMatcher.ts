@@ -625,9 +625,9 @@ export function matchSkillCommand(
   // Dedicated YouTube Data API search (opens the in-app results panel).
   if (isEnabled('youtube_search')) {
     const youtubeMatch =
-      input.match(/^(?:youtube\\s+(?:search(?:\\s+for)?|for)|search\\s+(?:on\\s+)?youtube(?:\\s+for)?)\\s+(.+)$/i) ||
-      input.match(/^youtube\\s+par\\s+(.+?)\\s+(?:search\\s+karo|dhundo)$/i) ||
-      input.match(/^یوٹیوب\\s+پر\\s+(.+?)\\s+(?:تلاش\\s+کرو|سرچ\\s+کرو|ڈھونڈو)$/);
+      input.match(/^(?:youtube\s+(?:search(?:\s+for)?|for)|search\s+(?:on\s+)?youtube(?:\s+for)?)\s+(.+)$/i) ||
+      input.match(/^youtube\s+par\s+(.+?)\s+(?:search\s+karo|dhundo)$/i) ||
+      input.match(/^یوٹیوب\s+پر\s+(.+?)\s+(?:تلاش\s+کرو|سرچ\s+کرو|ڈھونڈو)$/);
     if (youtubeMatch && youtubeMatch[1].trim().length > 1) {
       const query = youtubeMatch[1].trim().slice(0, 120);
       return {
