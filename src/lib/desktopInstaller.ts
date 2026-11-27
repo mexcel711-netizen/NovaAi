@@ -146,5 +146,5 @@ Write-Host 'ZARA is installed. The desktop companion uses a private token stored
     'echo.',
     'echo ZARA desktop installation completed.',
     'pause',
-  ].join('\\r\\n');
+  ].join('\r\n');
 }
