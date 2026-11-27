@@ -23,6 +23,7 @@ test('Windows installer creates an app shortcut and optional sign-in startup ent
   assert.match(powershell, /autostart=1#zara-bridge=/);
   assert.match(powershell, /NOVA_BRIDGE_TOKEN/);
   assert.match(powershell, /NOVA_ALLOWED_ORIGIN/);
+  assert.match(batch, /NOVA_INSTALL_PAYLOAD/);
   assert.doesNotMatch(batch, /private companion source/);
   assert.doesNotMatch(powershell, /private companion source/);
 });
