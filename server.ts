@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { createServer as createViteServer } from 'vite';
+import { searchYouTubeVideos, YouTubeApiError } from './src/lib/youtube';
 import { generateCloudflareRestReply } from './server/cloudflare';
 import {
   addKnowledgeSource,
@@ -1059,6 +1060,19 @@ async function startServer() {
     res.setHeader('Content-Type', 'application/bat; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="ZARA-Desktop-Setup.bat"');
     res.send(bat);
+  });
+
+  app.get('/api/youtube/search', async (req, res) => {
+    try {
+      const query = typeof req.query.q === 'string' ? req.query.q : '';
+      const items = await searchYouTubeVideos(process.env.YOUTUBE_API_KEY, query);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ items });
+    } catch (error) {
+      const status = error instanceof YouTubeApiError ? error.status : 500;
+      const message = error instanceof Error ? error.message : 'YouTube search failed.';
+      res.status(status).json({ error: message });
+    }
   });
 
   app.post('/api/tts', async (req, res) => {
