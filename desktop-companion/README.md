@@ -1,13 +1,19 @@
 # ZARA Desktop Companion (Windows)
 
-This optional local agent lets the ZARA web app request a small, explicit set of desktop actions. It binds only to `127.0.0.1`, requires a random pairing token, checks the ZARA site origin, and exposes only an allowlist (Chrome, Edge, Notepad, Calculator, HTTP/HTTPS URLs). It does **not** provide arbitrary shell access, file-system access, keystroke injection, or remote desktop access.
+This optional local agent lets the ZARA web app request a small, explicit set of desktop actions. It binds only to `127.0.0.1`, requires a random per-install pairing token, checks the ZARA site origin, and exposes only allowlisted operations. It does **not** provide arbitrary shell access, unrestricted file-system access, administrator/root access, keystroke injection, or remote desktop access.
 
 ## Requirements
 - Windows 10/11
 - Node.js 20+ or Bun
 - ZARA repository dependencies installed (`bun install`)
 
-## Start
+## Windows desktop installer and sign-in startup
+
+For the installed Windows experience, open Settings → Laptop & Installer, download Windows Installer (.bat), and run it. It creates a ZARA AI desktop shortcut, writes the companion under %LOCALAPPDATA%\ZARA AI, and generates a random local pairing token. The installer asks whether to add both ZARA and the hidden companion launcher to the current Windows user's Startup folder. The ZARA shortcut carries the token in its URL fragment; the app saves it in local storage and removes the fragment from the visible URL. On ?autostart=1, ZARA speaks a "Hello Boss" welcome after loading saved preferences. Browser autoplay restrictions or first-run permission prompts can still affect audio.
+
+Node.js 18+ is required. Microsoft Edge is used for the preferred app-window shortcut; when it is not installed, the installer creates a normal web shortcut.
+
+## Manual development start
 Open PowerShell in the repository root:
 
 ```powershell
@@ -15,7 +21,7 @@ bun install
 bun run desktop:companion
 ```
 
-The terminal prints a one-time pairing token. Keep the terminal open and paste that token into the ZARA **Desktop Bridge** panel. Do not share it. Stop the companion with Ctrl+C.
+The terminal prints a one-time pairing token. Keep the terminal open and paste that token into the ZARA **Desktop Bridge** panel. Do not share it. Stop the companion with Ctrl+C. This manual mode is useful for development; the Windows installer handles token provisioning and startup registration automatically.
 
 Optional fixed token (store it securely; do not commit it):
 
