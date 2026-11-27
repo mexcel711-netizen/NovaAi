@@ -284,7 +284,7 @@ export function DesktopBridgePanel() {
         </ul>
       )}
       <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
-        Install the local companion from Settings &rarr; Laptop &amp; Installer so anyone can run NOVA on Windows, macOS, or Linux.
+        The Windows installer can pair this browser automatically. Manual token pairing remains available for development and recovery.
       </p>
     </section>
   );
