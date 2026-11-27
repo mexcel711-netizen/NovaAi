@@ -1,3 +1,4 @@
+import { searchYouTubeVideos, YouTubeApiError } from '../src/lib/youtube';
 import { computeEvolutionProgress } from '../src/lib/characterEngine';
 import { detectEmotionFromText, extractEmotionAndCleanText } from '../src/lib/emotionAndSpeech';
 import { detectUrduIntent } from '../src/lib/skillMatcher';
@@ -30,6 +31,7 @@ interface FeatureEnv {
   ASSETS: { fetch(request: Request): Promise<Response> };
   AI?: unknown;
   GEMINI_API_KEY?: string;
+  YOUTUBE_API_KEY?: string;
 }
 
 type Row = Record<string, unknown>;
@@ -760,6 +762,17 @@ export async function handleFeatureRoute(request: Request, env: FeatureEnv): Pro
   const path = url.pathname;
   const method = request.method;
   const db = env.DB;
+
+  if (path === '/api/youtube/search' && method === 'GET') {
+    try {
+      const items = await searchYouTubeVideos(env.YOUTUBE_API_KEY, url.searchParams.get('q') ?? '');
+      return json({ items });
+    } catch (error) {
+      const status = error instanceof YouTubeApiError ? error.status : 500;
+      const message = error instanceof Error ? error.message : 'YouTube search failed.';
+      return json({ error: message }, status);
+    }
+  }
 
   if (path === '/api/state' && method === 'GET') return stateResponse(db, env);
 
